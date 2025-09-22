@@ -27,6 +27,9 @@
          x-transition.opacity.duration.500ms
          class="space-y-4 transform transition-all duration-300 hover:scale-[1.01]">
 
+        <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
+            Here's your snipto:
+        </p>
         <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm
                 break-words whitespace-pre-wrap"
              x-text="payload">
@@ -41,6 +44,9 @@
          x-transition.opacity.duration.500ms
          x-transition.scale.origin.top
          class="space-y-4 transform transition-all duration-300">
+        <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
+            Got something to share? Snipto it.
+        </p>
         <textarea x-model="userInput" rows="5" placeholder="Type or paste your text here"
                   x-ref="textarea"
                   class="w-full border rounded p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none
@@ -161,7 +167,7 @@
                     this.payload = decrypted.trim();
                     this.iv = data.iv;
                     this.expires_at = data.expires_at;
-                    this.views_remaining = data.views_remaining;
+                    this.views_remaining = data.views_remaining - 1;
                     this.showPayload = true;
 
                     // Mark as viewed using encrypted payload
