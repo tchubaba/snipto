@@ -1,68 +1,96 @@
-@extends('layouts.header')
+@extends('layouts.main')
 
-@section('title', 'Snipto')
+@section('content')
 
-<div class="max-w-xl w-full bg-white rounded-xl shadow-lg p-6 space-y-4"
+<div class="max-w-xl w-full rounded-xl p-6 space-y-4
+                shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                transition-colors duration-300"
      x-data="sniptoComponent()"
      x-init="init()">
 
     <!-- Loader -->
-    <div x-show="loading" class="flex justify-center items-center space-x-2">
+    <div x-show="loading"
+         x-transition.opacity
+         class="flex justify-center items-center space-x-2 bg-gray-100 dark:bg-gray-800 p-4 rounded-xl">
         <svg class="animate-spin h-6 w-6 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span class="text-gray-500">Loading...</span>
+        <span class="text-gray-500 dark:text-gray-400">Loading...</span>
     </div>
 
     <!-- Display payload -->
-    <div x-show="showPayload" x-transition.opacity.duration.500ms class="space-y-4">
-        <div class="p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded">
-            <p x-text="payload" class="text-gray-800 break-words"></p>
+    <div x-show="showPayload"
+         x-transition.opacity.duration.500ms
+         class="space-y-4 transform transition-all duration-300 hover:scale-[1.01]">
+        <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm">
+            <p x-text="payload" class="break-words"></p>
         </div>
-        <p class="text-sm text-gray-500" x-text="'Expires at: ' + expires_at"></p>
-        <p class="text-sm text-gray-500" x-text="'Views remaining: ' + views_remaining"></p>
+        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'Expires at: ' + expires_at"></p>
+        <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'Views remaining: ' + views_remaining"></p>
     </div>
 
     <!-- Create new snipto -->
-    <div x-show="showForm" x-transition.opacity.duration.500ms class="space-y-4">
+    <div x-show="showForm"
+         x-transition.opacity.duration.500ms
+         x-transition.scale.origin.top
+         class="space-y-4 transform transition-all duration-300">
         <textarea x-model="userInput" rows="5" placeholder="Type or paste your text here"
-                  class="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none transition"></textarea>
+                  x-ref="textarea"
+                  class="w-full border rounded p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none
+                         dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200
+                         placeholder-gray-400 dark:placeholder-gray-500"></textarea>
         <button @click="submitSnipto()"
-                class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 transition">
+                class="bg-indigo-500 text-white px-4 py-2 rounded shadow hover:bg-indigo-600
+                       hover:shadow-lg transition transform duration-150 active:scale-95">
             Submit
         </button>
     </div>
 
     <!-- Success info -->
-    <div x-show="showSuccess" x-transition.opacity.duration.500ms class="space-y-4">
-        <p class="text-green-600">Snipto created successfully!</p>
-        <div class="flex items-center space-x-2">
+    <div x-show="showSuccess"
+         x-transition.opacity.duration.500ms
+         x-transition.scale.origin.top
+         class="space-y-4 transform transition-all duration-300">
+        <p class="text-green-600 dark:text-green-400 font-medium">Snipto created successfully!</p>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
             <input type="text" :value="fullUrl" readonly
                    x-ref="fullUrlInput"
-                   class="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                   class="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none
+                          dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
             <button @click="copyUrl()"
-                    class="bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600 transition">
+                    class="bg-indigo-500 text-white px-3 py-1 rounded shadow hover:bg-indigo-600
+                           hover:shadow-md transition transform duration-150 active:scale-95">
                 Copy
             </button>
         </div>
-        <canvas x-ref="qrcode"></canvas>
+        <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>
     </div>
 
     <!-- Toast notification -->
-    <div x-show="showToast" x-transition.opacity.duration.300ms
-         class="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded shadow">
+    <div x-show="showToast"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-300"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-2"
+         class="fixed bottom-4 right-4 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900
+                px-4 py-2 rounded shadow-lg z-50 text-sm">
         Copied to clipboard!
     </div>
 
     <!-- Error -->
-    <div x-show="errorMessage" x-text="errorMessage" class="text-red-600 mt-4"></div>
+    <div x-show="errorMessage"
+         x-transition.opacity.duration.300ms
+         x-text="errorMessage"
+         class="text-red-600 dark:text-red-400 mt-4 font-medium"></div>
 </div>
 
 <script>
     function sniptoComponent() {
         return {
-            slug: '{{ request()->path() }}'.replace(/^\/+/,''),
+            slug: '{{ request()->path() }}'.replace(/^\/+/, ''),
             key: null,
             iv: null,
             payload: '',
@@ -76,11 +104,21 @@
             userInput: '',
             fullUrl: '',
             showToast: false,
+            calledInit: false, // prevents double init
 
             async init() {
+                if (this.calledInit) return;
+                this.calledInit = true;
+
+                // Auto dark mode
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    document.documentElement.classList.add('dark');
+                }
+
                 if (!this.slug) {
                     this.showForm = true;
                     this.loading = false;
+                    this.$nextTick(() => this.$refs.textarea?.focus());
                     return;
                 }
 
@@ -88,6 +126,7 @@
                     const res = await fetch(`/api/snipto/${this.slug}`);
                     if (res.status === 404) {
                         this.showForm = true;
+                        this.$nextTick(() => this.$refs.textarea?.focus());
                         return;
                     }
                     if (!res.ok) throw new Error('Error fetching snipto');
@@ -99,18 +138,34 @@
                         return;
                     }
 
-                    const decrypted = CryptoJS.AES.decrypt(data.payload, this.key, { iv: CryptoJS.enc.Hex.parse(data.iv) }).toString(CryptoJS.enc.Utf8);
+                    // Decrypt safely
+                    let decrypted;
+                    try {
+                        decrypted = CryptoJS.AES.decrypt(data.payload, this.key, { iv: CryptoJS.enc.Hex.parse(data.iv) }).toString(CryptoJS.enc.Utf8);
+                    } catch {
+                        decrypted = '';
+                    }
+
+                    if (!decrypted) {
+                        this.errorMessage = 'Failed to decrypt your snipto. Please check your key.';
+                        return;
+                    }
+
                     this.payload = decrypted;
                     this.iv = data.iv;
                     this.expires_at = data.expires_at;
                     this.views_remaining = data.views_remaining;
                     this.showPayload = true;
 
-                    // Mark as viewed
+                    // Mark as viewed using encrypted payload
                     await fetch(`/api/snipto/${this.slug}/viewed`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ payload_hash: CryptoJS.SHA256(decrypted).toString() })
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.getCsrfToken(),
+                        },
+                        body: JSON.stringify({ payload_hash: CryptoJS.SHA256(data.payload).toString() }),
+                        credentials: 'same-origin'
                     });
                 } catch(err) {
                     this.errorMessage = err.message;
@@ -129,20 +184,24 @@
                 if (!this.userInput.trim()) return;
 
                 this.loading = true;
-                this.key = await this.generateRandomBytes(32); // 256-bit key
-                this.iv = await this.generateRandomBytes(16);  // 128-bit IV
+                this.key = await this.generateRandomBytes(32);
+                this.iv = await this.generateRandomBytes(16);
 
                 const encrypted = CryptoJS.AES.encrypt(this.userInput, this.key, { iv: CryptoJS.enc.Hex.parse(this.iv) }).toString();
 
                 try {
                     const res = await fetch('/api/snipto', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': this.getCsrfToken(),
+                        },
                         body: JSON.stringify({
                             slug: this.slug,
                             payload: encrypted,
                             iv: this.iv
-                        })
+                        }),
+                        credentials: 'same-origin'
                     });
 
                     const body = await res.json();
@@ -156,8 +215,6 @@
                     this.fullUrl = `${window.location.origin}/${this.slug}#k=${this.key}`;
 
                     QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
-
-                    // Auto-select input
                     this.$refs.fullUrlInput.select();
                 } catch {
                     this.errorMessage = 'An error occurred. Please try again.';
@@ -171,9 +228,12 @@
                     this.showToast = true;
                     setTimeout(() => this.showToast = false, 2000);
                 });
+            },
+
+            getCsrfToken() {
+                return document.querySelector('meta[name="csrf-token"]').content;
             }
         }
     }
 </script>
-
-@extends('layouts.footer')
+@endsection

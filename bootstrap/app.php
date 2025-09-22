@@ -11,10 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->validateCsrfTokens(except: [
-            'api/snipto',
-            'api/snipto/*',
-        ]);
+        //        $middleware->validateCsrfTokens(except: [
+        //            'api/snipto',
+        //            'api/snipto/*',
+        //        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
