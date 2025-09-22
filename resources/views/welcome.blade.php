@@ -31,7 +31,7 @@
         <!-- Quick Pitch -->
         <div class="space-y-2 text-gray-600 dark:text-gray-300">
             <p>🔒 End-to-end encryption ensures only you and your recipient can read the text.</p>
-            <p>⏳ Sniptos automatically expire after a set time or number of views.</p>
+            <p>⏳ Sniptos are ephemeral - they are deleted from our systems when viewed.</p>
             <p>⚡ Simple, fast, and private — no signups required.</p>
         </div>
     </div>

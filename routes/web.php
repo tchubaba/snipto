@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\ApiController;
-use App\Http\Controllers\SniptoController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -11,20 +10,23 @@ Route::get('/', function () {
 // ---------------------------
 // Static / reserved pages
 // ---------------------------
-Route::view('/faq', 'static.faq');
-Route::view('/contact', 'static.contact');
-Route::view('/terms', 'static.terms');
+Route::view('/faq', 'faq');
+Route::view('/contact', 'contact');
+Route::view('/terms', 'terms');
 
 // ---------------------------
 // Snipto API routes
 // ---------------------------
 // Create a new snippet (AJAX POST)
 Route::prefix('api/snipto')->group(function () {
-    Route::post('/', [ApiController::class, 'store']);
+    Route::post('/', [ApiController::class, 'store'])
+        ->middleware('throttle:10,1');
     Route::get('{slug}', [ApiController::class, 'show'])
-        ->where('slug', '[A-Za-z0-9_-]+');
+        ->where('slug', '[A-Za-z0-9_-]+')
+        ->middleware('throttle:20,1');
     Route::post('{slug}/viewed', [ApiController::class, 'markViewed'])
-        ->where('slug', '[A-Za-z0-9_-]+');
+        ->where('slug', '[A-Za-z0-9_-]+')
+        ->middleware('throttle:20,1');
 });
 
 // ---------------------------

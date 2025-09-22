@@ -45,7 +45,7 @@
          x-transition.scale.origin.top
          class="space-y-4 transform transition-all duration-300">
         <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
-            Got something to share? Snipto it.
+            Got something to share?
         </p>
         <textarea x-model="userInput" rows="5" placeholder="Type or paste your text here"
                   x-ref="textarea"
@@ -55,7 +55,7 @@
         <button @click="submitSnipto()"
                 class="bg-indigo-500 text-white px-4 py-2 rounded shadow hover:bg-indigo-600
                        hover:shadow-lg transition transform duration-150 active:scale-95">
-            Submit
+            Snipto it
         </button>
     </div>
 
@@ -64,7 +64,7 @@
          x-transition.opacity.duration.500ms
          x-transition.scale.origin.top
          class="space-y-4 transform transition-all duration-300">
-        <p class="text-green-600 dark:text-green-400 font-medium">Snipto created successfully!</p>
+        <p class="text-green-600 dark:text-green-400 font-medium">Here's your Snipto:</p>
         <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
             <input type="text" :value="fullUrl" readonly
                    x-ref="fullUrlInput"
@@ -104,8 +104,8 @@
     function sniptoComponent() {
         return {
             slug: '{{ request()->path() }}'.replace(/^\/+/, ''),
-            key: null,
-            iv: null,
+            key: null,          // derived AES key (hex)
+            iv: null,           // IV in hex
             payload: '',
             expires_at: '',
             views_remaining: 0,
@@ -119,6 +119,9 @@
             showToast: false,
             calledInit: false, // prevents double init
 
+            // ------------------------------
+            // Initialization
+            // ------------------------------
             async init() {
                 if (this.calledInit) return;
                 this.calledInit = true;
@@ -136,25 +139,39 @@
                 }
 
                 try {
-                    const res = await fetch(`/api/snipto/${this.slug}`);
+                    const res = await fetch(`/api/snipto/${this.slug}`, {
+                        method: 'GET',
+                        headers: { 'Accept': "application/json" }
+                    });
+
                     if (res.status === 404) {
                         this.showForm = true;
                         this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                         return;
+                    } else if (res.status === 429) {
+                        this.errorMessage = 'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.';
+                        return;
                     }
+
                     if (!res.ok) throw new Error('Error fetching snipto');
 
                     const data = await res.json();
-                    this.key = new URLSearchParams(window.location.hash.substring(1)).get('k');
-                    if (!this.key) {
+
+                    // Extract short secret from URL fragment
+                    const shortSecret = new URLSearchParams(window.location.hash.substring(1)).get('k');
+                    if (!shortSecret) {
                         this.errorMessage = 'Missing decryption key in URL.';
                         return;
                     }
 
-                    // Decrypt safely
+                    // Derive AES key from shortSecret + IV
+                    this.iv = data.iv;
+                    this.key = await this.deriveKey(shortSecret, this.iv);
+
+                    // Decrypt
                     let decrypted;
                     try {
-                        decrypted = CryptoJS.AES.decrypt(data.payload, this.key, { iv: CryptoJS.enc.Hex.parse(data.iv) }).toString(CryptoJS.enc.Utf8);
+                        decrypted = CryptoJS.AES.decrypt(data.payload, this.key, { iv: CryptoJS.enc.Hex.parse(this.iv) }).toString(CryptoJS.enc.Utf8);
                     } catch {
                         decrypted = '';
                     }
@@ -165,21 +182,22 @@
                     }
 
                     this.payload = decrypted.trim();
-                    this.iv = data.iv;
                     this.expires_at = data.expires_at;
                     this.views_remaining = data.views_remaining - 1;
                     this.showPayload = true;
 
-                    // Mark as viewed using encrypted payload
+                    // Mark as viewed
                     await fetch(`/api/snipto/${this.slug}/viewed`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': this.getCsrfToken(),
+                            'Accept': 'application/json'
                         },
                         body: JSON.stringify({ payload_hash: CryptoJS.SHA256(data.payload).toString() }),
                         credentials: 'same-origin'
                     });
+
                 } catch(err) {
                     this.errorMessage = err.message;
                 } finally {
@@ -187,19 +205,24 @@
                 }
             },
 
-            async generateRandomBytes(length) {
-                const array = new Uint8Array(length);
-                window.crypto.getRandomValues(array);
-                return Array.from(array).map(b => ('00'+b.toString(16)).slice(-2)).join('');
-            },
-
+            // ------------------------------
+            // Submission
+            // ------------------------------
             async submitSnipto() {
                 if (!this.userInput.trim()) return;
 
                 this.loading = true;
-                this.key = await this.generateRandomBytes(32);
+
+                // Generate short secret
+                const shortSecret = this.generateShortSecret(16);
+
+                // Generate IV
                 this.iv = await this.generateRandomBytes(16);
 
+                // Derive AES key
+                this.key = await this.deriveKey(shortSecret, this.iv);
+
+                // Encrypt
                 const encrypted = CryptoJS.AES.encrypt(this.userInput, this.key, { iv: CryptoJS.enc.Hex.parse(this.iv) }).toString();
 
                 try {
@@ -208,6 +231,7 @@
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': this.getCsrfToken(),
+                            'Accept': 'application/json'
                         },
                         body: JSON.stringify({
                             slug: this.slug,
@@ -217,6 +241,11 @@
                         credentials: 'same-origin'
                     });
 
+                    if (res.status === 429) {
+                        this.errorMessage = 'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.';
+                        return;
+                    }
+
                     const body = await res.json();
                     if (!res.ok || !body.success) {
                         this.errorMessage = 'An error occurred. Please try again.';
@@ -225,15 +254,69 @@
 
                     this.showForm = false;
                     this.showSuccess = true;
-                    this.fullUrl = `${window.location.origin}/${this.slug}#k=${this.key}`;
+                    this.fullUrl = `${window.location.origin}/${this.slug}#k=${shortSecret}`;
 
                     QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
                     this.$refs.fullUrlInput.select();
+
                 } catch {
                     this.errorMessage = 'An error occurred. Please try again.';
                 } finally {
                     this.loading = false;
                 }
+            },
+
+            // ------------------------------
+            // Short secret generator
+            // ------------------------------
+            generateShortSecret(length) {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                let result = '';
+                const array = new Uint8Array(length);
+                window.crypto.getRandomValues(array);
+                for (let i = 0; i < length; i++) {
+                    result += chars[array[i] % chars.length];
+                }
+                return result;
+            },
+
+            // ------------------------------
+            // AES key derivation using PBKDF2
+            // ------------------------------
+            async deriveKey(secret, ivHex) {
+                const enc = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    enc.encode(secret),
+                    { name: 'PBKDF2' },
+                    false,
+                    ['deriveBits', 'deriveKey']
+                );
+
+                const derivedKey = await crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: enc.encode(ivHex),
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-CBC', length: 256 },
+                    true,
+                    ['encrypt', 'decrypt']
+                );
+
+                const rawKey = await crypto.subtle.exportKey('raw', derivedKey);
+                return Array.from(new Uint8Array(rawKey)).map(b => ('00'+b.toString(16)).slice(-2)).join('');
+            },
+
+            // ------------------------------
+            // Utility
+            // ------------------------------
+            async generateRandomBytes(length) {
+                const array = new Uint8Array(length);
+                window.crypto.getRandomValues(array);
+                return Array.from(array).map(b => ('00'+b.toString(16)).slice(-2)).join('');
             },
 
             copyUrl() {
@@ -249,4 +332,5 @@
         }
     }
 </script>
+
 @endsection
