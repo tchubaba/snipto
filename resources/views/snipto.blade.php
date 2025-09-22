@@ -101,54 +101,76 @@
 </div>
 
 <script>
+    /**
+     * sniptoComponent
+     *
+     * This component powers the frontend behavior for Snipto.
+     * It handles both creating and viewing encrypted snippets ("sniptos").
+     *
+     * Key points:
+     * - All snippets are encrypted in the browser before sending to the server.
+     * - The decryption key never touches the server; it lives only in the URL fragment (#k=...).
+     * - AES-CBC is used for encryption, with keys derived via PBKDF2 from a short secret + IV.
+     * - The server only stores ciphertext, IV, and metadata (not the key).
+     * - Each snippet can expire after a number of views or a certain time.
+     */
     function sniptoComponent() {
         return {
-            slug: '{{ request()->path() }}'.replace(/^\/+/, ''),
-            key: null,          // derived AES key (hex)
-            iv: null,           // IV in hex
-            payload: '',
-            expires_at: '',
-            views_remaining: 0,
-            loading: true,
-            showPayload: false,
-            showForm: false,
-            showSuccess: false,
-            errorMessage: '',
-            userInput: '',
-            fullUrl: '',
-            showToast: false,
-            calledInit: false, // prevents double init
+            // ------------------------------
+            // State variables
+            // ------------------------------
+            slug: '{{ request()->path() }}'.replace(/^\/+/, ''), // unique identifier for the snippet, taken from URL path
+            key: null,          // derived AES key (hex string)
+            iv: null,           // initialization vector (hex string)
+            payload: '',        // decrypted snippet text
+            expires_at: '',     // expiration time returned from server
+            views_remaining: 0, // how many times this snippet can still be viewed
+            loading: true,      // controls loading spinner
+            showPayload: false, // whether to display the decrypted snippet
+            showForm: false,    // whether to display the "create snippet" form
+            showSuccess: false, // whether to display the "success" state after submission
+            errorMessage: '',   // stores any error messages for user feedback
+            userInput: '',      // text entered by user for new snippet
+            fullUrl: '',        // full sharable URL containing slug + secret
+            showToast: false,   // controls "copied to clipboard" toast
+            calledInit: false,  // prevents init() from running more than once
 
             // ------------------------------
-            // Initialization
+            // Initialization logic
             // ------------------------------
             async init() {
                 if (this.calledInit) return;
                 this.calledInit = true;
 
-                // Auto dark mode
+                // Enable dark mode automatically if user prefers it
                 if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     document.documentElement.classList.add('dark');
                 }
 
+                // If there's no slug in the URL, we are in "create new snippet" mode
                 if (!this.slug) {
                     this.showForm = true;
                     this.loading = false;
+                    // Automatically focus textarea after a short delay
                     this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                     return;
                 }
 
                 try {
+                    // Fetch snippet metadata (ciphertext, IV, etc.) from the server
                     const res = await fetch(`/api/snipto/${this.slug}`, {
                         method: 'GET',
                         headers: { 'Accept': "application/json" }
                     });
 
+                    // If snippet doesn’t exist, show "create new" form
                     if (res.status === 404) {
                         this.showForm = true;
                         this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                         return;
-                    } else if (res.status === 429) {
+                    }
+                    // If user is rate-limited
+                    else if (res.status === 429) {
                         this.errorMessage = 'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.';
                         return;
                     }
@@ -157,36 +179,42 @@
 
                     const data = await res.json();
 
-                    // Extract short secret from URL fragment
+                    // The short secret is embedded in the URL fragment (#k=...)
                     const shortSecret = new URLSearchParams(window.location.hash.substring(1)).get('k');
                     if (!shortSecret) {
                         this.errorMessage = 'Missing decryption key in URL.';
                         return;
                     }
 
-                    // Derive AES key from shortSecret + IV
+                    // Derive AES key from short secret + IV
                     this.iv = data.iv;
                     this.key = await this.deriveKey(shortSecret, this.iv);
 
-                    // Decrypt
+                    // Attempt to decrypt payload
                     let decrypted;
                     try {
-                        decrypted = CryptoJS.AES.decrypt(data.payload, this.key, { iv: CryptoJS.enc.Hex.parse(this.iv) }).toString(CryptoJS.enc.Utf8);
+                        decrypted = CryptoJS.AES.decrypt(
+                            data.payload,
+                            this.key,
+                            { iv: CryptoJS.enc.Hex.parse(this.iv) }
+                        ).toString(CryptoJS.enc.Utf8);
                     } catch {
                         decrypted = '';
                     }
 
+                    // If decryption fails, show error
                     if (!decrypted) {
                         this.errorMessage = 'Failed to decrypt your snipto. Please check your key.';
                         return;
                     }
 
+                    // Save decrypted text and metadata
                     this.payload = decrypted.trim();
                     this.expires_at = data.expires_at;
                     this.views_remaining = data.views_remaining - 1;
                     this.showPayload = true;
 
-                    // Mark as viewed
+                    // Notify server that snippet was viewed
                     await fetch(`/api/snipto/${this.slug}/viewed`, {
                         method: 'POST',
                         headers: {
@@ -194,7 +222,9 @@
                             'X-CSRF-TOKEN': this.getCsrfToken(),
                             'Accept': 'application/json'
                         },
-                        body: JSON.stringify({ payload_hash: CryptoJS.SHA256(data.payload).toString() }),
+                        body: JSON.stringify({
+                            payload_hash: CryptoJS.SHA256(data.payload).toString()
+                        }),
                         credentials: 'same-origin'
                     });
 
@@ -206,26 +236,31 @@
             },
 
             // ------------------------------
-            // Submission
+            // Submitting a new snippet
             // ------------------------------
             async submitSnipto() {
                 if (!this.userInput.trim()) return;
 
                 this.loading = true;
 
-                // Generate short secret
+                // 1. Generate a short secret (the actual "key fragment" stored in URL hash)
                 const shortSecret = this.generateShortSecret(16);
 
-                // Generate IV
+                // 2. Generate a random IV
                 this.iv = await this.generateRandomBytes(16);
 
-                // Derive AES key
+                // 3. Derive AES key from secret + IV
                 this.key = await this.deriveKey(shortSecret, this.iv);
 
-                // Encrypt
-                const encrypted = CryptoJS.AES.encrypt(this.userInput, this.key, { iv: CryptoJS.enc.Hex.parse(this.iv) }).toString();
+                // 4. Encrypt user input with AES-CBC
+                const encrypted = CryptoJS.AES.encrypt(
+                    this.userInput,
+                    this.key,
+                    { iv: CryptoJS.enc.Hex.parse(this.iv) }
+                ).toString();
 
                 try {
+                    // Send encrypted payload and IV to server (never the key)
                     const res = await fetch('/api/snipto', {
                         method: 'POST',
                         headers: {
@@ -241,6 +276,7 @@
                         credentials: 'same-origin'
                     });
 
+                    // Handle rate limiting
                     if (res.status === 429) {
                         this.errorMessage = 'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.';
                         return;
@@ -252,11 +288,15 @@
                         return;
                     }
 
+                    // Success: show link with embedded key
                     this.showForm = false;
                     this.showSuccess = true;
                     this.fullUrl = `${window.location.origin}/${this.slug}#k=${shortSecret}`;
 
+                    // Generate QR code for quick sharing
                     QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
+
+                    // Auto-select the link text for easy copying
                     this.$refs.fullUrlInput.select();
 
                 } catch {
@@ -267,7 +307,7 @@
             },
 
             // ------------------------------
-            // Short secret generator
+            // Secret generator (random alphanumeric)
             // ------------------------------
             generateShortSecret(length) {
                 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -281,7 +321,13 @@
             },
 
             // ------------------------------
-            // AES key derivation using PBKDF2
+            // Derive AES key using PBKDF2
+            //
+            // We derive a 256-bit AES key from:
+            // - the short secret (user-held key fragment)
+            // - the IV (used as salt)
+            //
+            // This makes brute-forcing harder and ensures key uniqueness.
             // ------------------------------
             async deriveKey(secret, ivHex) {
                 const enc = new TextEncoder();
@@ -306,19 +352,27 @@
                     ['encrypt', 'decrypt']
                 );
 
+                // Export key as hex string for CryptoJS
                 const rawKey = await crypto.subtle.exportKey('raw', derivedKey);
-                return Array.from(new Uint8Array(rawKey)).map(b => ('00'+b.toString(16)).slice(-2)).join('');
+                return Array.from(new Uint8Array(rawKey))
+                    .map(b => ('00'+b.toString(16)).slice(-2))
+                    .join('');
             },
 
             // ------------------------------
-            // Utility
+            // Generate secure random hex string
             // ------------------------------
             async generateRandomBytes(length) {
                 const array = new Uint8Array(length);
                 window.crypto.getRandomValues(array);
-                return Array.from(array).map(b => ('00'+b.toString(16)).slice(-2)).join('');
+                return Array.from(array)
+                    .map(b => ('00'+b.toString(16)).slice(-2))
+                    .join('');
             },
 
+            // ------------------------------
+            // Copy full URL to clipboard
+            // ------------------------------
             copyUrl() {
                 navigator.clipboard.writeText(this.fullUrl).then(() => {
                     this.showToast = true;
@@ -326,6 +380,9 @@
                 });
             },
 
+            // ------------------------------
+            // Grab CSRF token from page <meta>
+            // ------------------------------
             getCsrfToken() {
                 return document.querySelector('meta[name="csrf-token"]').content;
             }
