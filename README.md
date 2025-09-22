@@ -15,10 +15,6 @@
 - **Customizable View Limit:** Specify how many times a snippet can be viewed before it is automatically deleted.
 - **QR Code Generation:** Generate a QR code upon snippet creation URL for easy sharing.
 
-### Technical Highlights
-- **Client-Side Encryption:** Uses a unique key in the URL fragment (`#k=`), never sent to the server.
-- **CSRF-Protected Internal API:** Internal AJAX endpoints are fully CSRF-protected.
-
 ---
 
 ## How It Works
@@ -29,7 +25,7 @@
     - If it exists, it'll retrieve your snippet and decrypt it client-side with the supplied encryption key.
 3. **Snippet Encryption:** The snippet is encrypted in the browser with a randomly generated encryption key. The key is appended to the URL as `#k=`. The server stores only the encrypted payload.
 4. **Shareable URL & QR Code:** After submission, the full snippet URL (with included randomly generated encryption key) along with a QR code is displayed.
-5. **Automatic Expiration:** Snippets single use only — once they are viewed, they are removed from the database. Otherwise they'll expire automatically in 1 week. 
+5. **Automatic Expiration:** Snippets single use only — once they are viewed, they are removed from the database. Otherwise they'll expire automatically in 1 week.
 6. **View Verification:** Only a client that successfully decrypts a snippet can mark it as viewed, preventing premature deletion.
 
 ---
@@ -46,13 +42,36 @@
 1. Navigate to the snippet URL, including the `#k=` key.
 2. The snippet will decrypt and be displayed in the browser.
 3. The snippet is removed permanently from the database.
- 
+
 ---
 
 ## Security Notes
-- Encryption keys are **never transmitted to the server**.
-- All data at rest on the server is stored in encrypted form.
-- The project is fully open-source — you can audit the code for peace of mind.
+
+Snipto is designed with **end-to-end encryption (E2EE)** as a first-class principle. Here’s how it works technically:
+
+- **Encryption Algorithm:**  
+  Snippets are encrypted using **AES-256 in CBC mode** via the browser’s [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API).
+
+- **Key Derivation:**  
+  A short, random alphanumeric “secret” is generated in the browser. This secret is never sent to the server. The browser derives a 256-bit AES key from it using **PBKDF2-HMAC-SHA256** with 100,000 iterations.
+    - The **Initialization Vector (IV)** is also randomly generated per snippet.
+    - The IV doubles as the salt in PBKDF2, ensuring the derived key is unique even if the same short secret is reused.
+
+- **Payload Handling:**
+    - Plaintext is encrypted client-side into base64 encoded ciphertext.
+    - Only the ciphertext and IV are sent to the server.
+    - The server never receives the plaintext or the key.
+
+- **Decryption:**  
+  To read a snippet, the recipient must have the full URL including `#k=<secret>`. The secret is extracted from the hash fragment, which is **never transmitted in HTTP requests** (browsers do not send fragments to servers). The browser re-derives the AES key and decrypts the ciphertext locally.
+
+- **Integrity Verification:**  
+  The client also computes a **SHA-256 hash of the ciphertext** when marking a snippet as “viewed.” This ensures the server only deletes snippets that were successfully decrypted, preventing accidental or malicious premature deletion.
+
+- **Ephemerality:**  
+  Snippets are deleted after the configured number of views or TTL. This ensures encrypted data does not persist indefinitely. Currently the number of view is alwyas 1.
+
+In short: **the server cannot decrypt your data** — only someone with the full URL (including the secret fragment) can.
 
 ---
 
