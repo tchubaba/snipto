@@ -103,7 +103,7 @@
                 </p>
             </div>
 
-            <div>
+            <div id="end-to-end">
                 <h2 class="text-xl font-semibold mb-2">🛡️ How can I be sure my Snipto is end-to-end encrypted?</h2>
                 <p class="mt-2">
                     All encryption and decryption happens <strong>directly in your browser</strong>. The JavaScript code that performs this is fully readable — you can see exactly how your Snipto is scrambled and unscrambled. The logic is completely transparent.

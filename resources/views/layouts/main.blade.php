@@ -13,6 +13,7 @@
         }
     </script>
 
+    <script type="module" src="{{ asset('build/js/snipto.js') }}"></script>
     @vite([
         'resources/css/app.css',
         'resources/js/app.js'
