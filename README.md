@@ -1,61 +1,71 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Snipto
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## About Laravel
+**Snipto** is a secure, lightweight online snippet sharing service. It allows users to quickly create and share text snippets via unique URLs, with **end-to-end encryption**, ephemeral storage, and QR code integration. Snipto is designed for personal use, teams, and anyone who wants a private alternative to public paste services.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Features
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Core Features
+- **Instant Snippet Creation:** No “create” page — simply visit a URL and start typing.
+- **End-to-End Encryption:** All content is encrypted client-side. Only the person with the link and encryption key can read the snippet.
+- **Ephemeral Snippets:** By default, snippets are deleted after first view, or they expire after a configurable TTL (default: 1 week).
+- **Customizable View Limit:** Specify how many times a snippet can be viewed before it is automatically deleted.
+- **QR Code Generation:** Generate a QR code upon snippet creation URL for easy sharing.
 
-## Learning Laravel
+### Technical Highlights
+- **Client-Side Encryption:** Uses a unique key in the URL fragment (`#k=`), never sent to the server.
+- **CSRF-Protected Internal API:** Internal AJAX endpoints are fully CSRF-protected.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## How It Works
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+1. **Access a Snipto URL:** Visit `https://snipto.net/{slug}`.
+2. **Create or View:**
+    - If the slug does not exist, you can create a snippet.
+    - If it exists, it'll retrieve your snippet and decrypt it client-side with the supplied encryption key.
+3. **Snippet Encryption:** The snippet is encrypted in the browser with a randomly generated encryption key. The key is appended to the URL as `#k=`. The server stores only the encrypted payload.
+4. **Shareable URL & QR Code:** After submission, the full snippet URL (with included randomly generated encryption key) along with a QR code is displayed.
+5. **Automatic Expiration:** Snippets single use only — once they are viewed, they are removed from the database. Otherwise they'll expire automatically in 1 week. 
+6. **View Verification:** Only a client that successfully decrypts a snippet can mark it as viewed, preventing premature deletion.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Usage Instructions
 
-### Premium Partners
+### Creating a Snippet
+1. Navigate to `https://snipto.net/{your-slug}`.
+2. Enter your content in the text area.
+3. The snippet is encrypted in the browser.
+4. Click **Submit**. The page dynamically shows your full URL with `#k=` and a QR code.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### Viewing a Snippet
+1. Navigate to the snippet URL, including the `#k=` key.
+2. The snippet will decrypt and be displayed in the browser.
+3. The snippet is removed permanently from the database.
+ 
+---
 
-## Contributing
+## Security Notes
+- Encryption keys are **never transmitted to the server**.
+- All data at rest on the server is stored in encrypted form.
+- The project is fully open-source — you can audit the code for peace of mind.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## Future Plans
+- Support for **Markdown**, **images**, and other media types.
+- Custom TTL and view-limit configuration per snippet.
+- Optional client-side password management for extra security.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
 ## License
+This project is licensed under the [MIT License](LICENSE).
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+**Snipto** — Share your snippets. End-to-end encrypted.
