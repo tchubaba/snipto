@@ -11,21 +11,27 @@
     <!-- Loader -->
     <div x-show="loading"
          x-transition.opacity
-         class="flex justify-center items-center space-x-2 bg-gray-100 dark:bg-gray-800 p-4 rounded-xl">
-        <svg class="animate-spin h-6 w-6 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-        </svg>
-        <span class="text-gray-500 dark:text-gray-400">Loading...</span>
+         class="fixed inset-0 bg-gray-200/50 dark:bg-gray-900/50 flex justify-center items-center z-40">
+        <div class="flex justify-center items-center space-x-2 bg-gray-100 dark:bg-gray-800 p-4 rounded-xl shadow-lg">
+            <svg class="animate-spin h-6 w-6 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span class="text-gray-500 dark:text-gray-400">Loading...</span>
+        </div>
     </div>
+
 
     <!-- Display payload -->
     <div x-show="showPayload"
          x-transition.opacity.duration.500ms
          class="space-y-4 transform transition-all duration-300 hover:scale-[1.01]">
-        <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm">
-            <p x-text="payload" class="break-words"></p>
+
+        <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm
+                break-words whitespace-pre-wrap"
+             x-text="payload">
         </div>
+
         <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'Expires at: ' + expires_at"></p>
         <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'Views remaining: ' + views_remaining"></p>
     </div>
@@ -70,15 +76,16 @@
     <!-- Toast notification -->
     <div x-show="showToast"
          x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-y-2"
+         x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
          x-transition:leave="transition ease-in duration-300"
          x-transition:leave-start="opacity-100 translate-y-0"
-         x-transition:leave-end="opacity-0 translate-y-2"
+         x-transition:leave-end="opacity-0 translate-y-4"
          class="fixed bottom-4 right-4 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900
-                px-4 py-2 rounded shadow-lg z-50 text-sm">
+            px-4 py-2 rounded shadow-lg z-50 text-sm">
         Copied to clipboard!
     </div>
+
 
     <!-- Error -->
     <div x-show="errorMessage"
@@ -118,7 +125,7 @@
                 if (!this.slug) {
                     this.showForm = true;
                     this.loading = false;
-                    this.$nextTick(() => this.$refs.textarea?.focus());
+                    this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                     return;
                 }
 
@@ -126,7 +133,7 @@
                     const res = await fetch(`/api/snipto/${this.slug}`);
                     if (res.status === 404) {
                         this.showForm = true;
-                        this.$nextTick(() => this.$refs.textarea?.focus());
+                        this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                         return;
                     }
                     if (!res.ok) throw new Error('Error fetching snipto');
@@ -151,7 +158,7 @@
                         return;
                     }
 
-                    this.payload = decrypted;
+                    this.payload = decrypted.trim();
                     this.iv = data.iv;
                     this.expires_at = data.expires_at;
                     this.views_remaining = data.views_remaining;
