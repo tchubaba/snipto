@@ -14,28 +14,28 @@
         </div>
 
         <!-- Jump to Snipto Form -->
-        <div class="w-full relative">
+        <div class="w-full max-w-md mx-auto relative">
             <form action="/" method="GET" onsubmit="return goToSnipto(event)">
-                <div class="flex items-center justify-center bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
                     <span class="px-3 text-gray-500 dark:text-gray-400 select-none">https://snipto.net/</span>
                     <input id="slugInput" type="text" name="slug" placeholder="your-snipto"
-                           class="flex-1 p-3 bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500">
+                           class="flex-1 p-3 bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 w-full sm:w-auto">
                     <button type="submit"
-                            class="bg-indigo-500 text-white px-5 py-3 hover:bg-indigo-600 transition font-bold text-lg">
+                            class="bg-indigo-500 text-white px-5 py-3 hover:bg-indigo-600 transition font-bold text-lg flex-shrink-0">
                         &gt;
                     </button>
                 </div>
-
-                <!-- Toast Notification -->
-                <div id="toast" class="hidden absolute left-0 right-0 mx-auto top-[calc(100%+0.5rem)] max-w-[calc(100%-6rem)] bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg transition-opacity duration-300 opacity-0 z-10">
-                    <p class="text-sm font-medium">Please use only alphanumeric characters (letters and numbers).</p>
-                </div>
-
-                <!-- Terms of Service notice -->
-                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-                    By using Snipto, you agree with the <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">Terms of Service</a>.
-                </p>
             </form>
+
+            <!-- Toast Notification -->
+            <div id="toast" class="hidden absolute left-0 right-0 mx-auto top-[calc(100%+0.5rem)] max-w-[calc(100%-6rem)] bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg transition-opacity duration-300 opacity-0 z-10">
+                <p class="text-sm font-medium">Please use only alphanumeric characters (letters and numbers).</p>
+            </div>
+
+            <!-- Terms of Service notice -->
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+                By using Snipto, you agree with the <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">Terms of Service</a>.
+            </p>
         </div>
 
         <!-- Quick Pitch -->
