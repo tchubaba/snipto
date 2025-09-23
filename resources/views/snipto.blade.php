@@ -35,9 +35,6 @@
                     break-words whitespace-pre-wrap"
                  x-text="payload">
             </div>
-
-            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'Expires at: ' + expires_at"></p>
-            <p class="text-sm text-gray-500 dark:text-gray-400" x-text="'Views remaining: ' + views_remaining"></p>
         </div>
 
         <!-- Create new snipto -->

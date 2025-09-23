@@ -3,7 +3,7 @@
 @section('title', 'Snipto - Encrypted Sharing Made Simple')
 
 @section('content')
-    <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full">
+    <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
         <!-- Hero Section -->
         <div class="space-y-4">
             <h1 class="text-4xl sm:text-5xl font-extrabold text-indigo-500">Snipto</h1>
@@ -14,7 +14,7 @@
         </div>
 
         <!-- Jump to Snipto Form -->
-        <div class="w-full">
+        <div class="w-full relative">
             <form action="/" method="GET" onsubmit="return goToSnipto(event)">
                 <div class="flex items-center justify-center bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
                     <span class="px-3 text-gray-500 dark:text-gray-400 select-none">https://snipto.net/</span>
@@ -24,6 +24,11 @@
                             class="bg-indigo-500 text-white px-5 py-3 hover:bg-indigo-600 transition font-bold text-lg">
                         &gt;
                     </button>
+                </div>
+
+                <!-- Toast Notification -->
+                <div id="toast" class="hidden absolute left-0 right-0 mx-auto top-[calc(100%+0.5rem)] max-w-[calc(100%-6rem)] bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg transition-opacity duration-300 opacity-0 z-10">
+                    <p class="text-sm font-medium">Please use only alphanumeric characters (letters and numbers).</p>
                 </div>
 
                 <!-- Terms of Service notice -->
@@ -44,9 +49,24 @@
     <script>
         function goToSnipto(e) {
             e.preventDefault();
-            const slug = document.getElementById('slugInput').value.trim();
-            if (slug) {
+            const slugInput = document.getElementById('slugInput');
+            const slug = slugInput.value.trim();
+            const toast = document.getElementById('toast');
+            const alphanumericRegex = /^[a-zA-Z0-9]+$/;
+
+            if (slug && alphanumericRegex.test(slug)) {
                 window.location.href = '/' + slug;
+            } else {
+                // Show toast notification
+                toast.classList.remove('hidden', 'opacity-0');
+                toast.classList.add('opacity-100');
+
+                // Auto-hide toast after 3 seconds
+                setTimeout(() => {
+                    toast.classList.remove('opacity-100');
+                    toast.classList.add('opacity-0');
+                    setTimeout(() => toast.classList.add('hidden'), 300);
+                }, 3000);
             }
             return false;
         }
