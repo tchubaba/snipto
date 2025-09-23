@@ -1,18 +1,31 @@
 import { defineConfig } from 'vite';
-import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig({
-    root: process.cwd(),
+    publicDir: false, // don't copy favicons, robots.txt, etc.
+
     build: {
-        outDir: 'dist/snipto', // separate from publicDir
-        emptyOutDir: true,
+        outDir: 'public/js',
+        emptyOutDir: false, // don't wipe public/js
         rollupOptions: {
             input: path.resolve(__dirname, 'resources/js/standalone/snipto.js'),
             output: {
-                entryFileNames: 'snipto.js', // keep readable
+                entryFileNames: 'snipto.js',
+                // If you import things like alpinejs, qrcode, etc.,
+                // Rollup will expect them as globals instead of bundling.
+                globals: {
+                    alpinejs: 'Alpine',
+                    axios: 'axios',
+                    qrcode: 'QRCode',
+                },
             },
+            external: [
+                'alpinejs',
+                'axios',
+                'qrcode',
+            ],
         },
-        minify: false, // snipto.js should not be minified
+        minify: false,
+        sourcemap: true, // optional, makes it nice for debugging
     },
 });
