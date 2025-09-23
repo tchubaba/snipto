@@ -9,7 +9,7 @@
             <h1 class="text-4xl sm:text-5xl font-extrabold text-indigo-500">Snipto</h1>
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
                 An end-to-end encrypted paste service.<br>
-                Share sensitive text securely. No accounts, no hassle.
+                Share text securely. No accounts, no hassle.
             </p>
         </div>
 
