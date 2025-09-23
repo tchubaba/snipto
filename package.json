@@ -3,7 +3,8 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
+        "build": "vite build && vite build --config vite.snipto.config.js && npm run copy-snipto",
+        "copy-snipto": "cp dist/snipto/snipto.js public/js/snipto.js",
         "dev": "vite"
     },
     "devDependencies": {
@@ -15,6 +16,7 @@
         "vite": "^7.0.4"
     },
     "dependencies": {
-        "alpinejs": "^3.15.0"
+        "alpinejs": "^3.15.0",
+        "qrcode": "^1.5.4"
     }
 }

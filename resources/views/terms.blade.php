@@ -23,7 +23,7 @@
                 <p>
                     While we do our best to keep things safe and private, Snipto is provided
                     <strong>as-is</strong>, for free, with <strong>no warranties</strong> of any kind.
-                    We cannot promise the service will always work perfectly or that your sniptos won’t be lost.
+                    You use it at your own risk.
                 </p>
             </div>
 
@@ -61,7 +61,9 @@
 
             <div>
                 <p>
-                    By using Snipto, you acknowledge and accept the terms as described here.
+                    By using Snipto, you acknowledge and accept the terms as described here. If you have any questions
+                    about how Snipto works, see our <a href="/faq" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">FAQ</a>
+                    or <a href="/contact" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">Contact Us</a>.
                 </p>
             </div>
 

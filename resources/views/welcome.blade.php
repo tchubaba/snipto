@@ -25,6 +25,11 @@
                         &gt;
                     </button>
                 </div>
+
+                <!-- Terms of Service notice -->
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+                    By using Snipto, you agree with the <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">Terms of Service</a>.
+                </p>
             </form>
         </div>
 

@@ -106,17 +106,22 @@
             <div id="end-to-end">
                 <h2 class="text-xl font-semibold mb-2">🛡️ How can I be sure my Snipto is end-to-end encrypted?</h2>
                 <p class="mt-2">
-                    All encryption and decryption happens <strong>directly in your browser</strong>. The JavaScript code that performs this is fully readable — you can see exactly how your Snipto is scrambled and unscrambled. The logic is completely transparent.
+                    All encryption and decryption happens <strong>directly in your browser</strong>. The JavaScript code
+                    that performs these operations (snipto.js) is not minified and fully readable for transparency.
                 </p>
                 <p class="mt-2">
-                    You can also inspect any network requests in your browser while creating or reading Sniptos. You will see that only scrambled, unreadable ciphertext is ever sent to our servers — the plain text of your Snipto and your encryption key are never transmitted or exposed.
+                    You can also inspect any network requests in your browser while creating or reading Sniptos. You will
+                    see that only scrambled, unreadable ciphertext is ever sent to our servers — the plain text of your
+                    Snipto and your encryption key are never transmitted or exposed.
                 </p>
                 <p class="mt-2">
                     Snipto is an <strong>open-source project</strong>. All source code is available at
                     <a href="https://github.com/tchubaba/snipto" target="_blank" class="text-indigo-500 hover:underline">
                         https://github.com/tchubaba/snipto
                     </a>
-                    for anyone to inspect and verify. For those who want full control, you can also <strong>clone the repository and self-host</strong> your own instance of Snipto, ensuring your data never touches our servers.
+                    for anyone to inspect and verify. For those who want full control, you can also <strong>clone the
+                    repository and self-host</strong> your own instance of Snipto, ensuring your data never touches
+                    our servers.
                 </p>
             </div>
 

@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+
 export function sniptoComponent() {
     /**
      * Alpine.js component for Snipto frontend logic.

@@ -1,9 +1,8 @@
 import './bootstrap';
+import Alpine from 'alpinejs';
+import { sniptoComponent } from './standalone/snipto.js';
 
-import Alpine from 'alpinejs'
+window.sniptoComponent = sniptoComponent;
+window.Alpine = Alpine;
 
-// If you want Alpine's instance to be available globally.
-
-window.Alpine = Alpine
-
-Alpine.start()
+Alpine.start();
