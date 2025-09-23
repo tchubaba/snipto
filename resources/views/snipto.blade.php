@@ -35,6 +35,10 @@
                     break-words whitespace-pre-wrap"
                  x-text="payload">
             </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+                If this is something you want to keep, copy and paste it elsewhere - this Snipto has now been
+                deleted from our servers and cannot be viewed again.
+            </p>
         </div>
 
         <!-- Create new snipto -->
