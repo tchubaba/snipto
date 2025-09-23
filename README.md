@@ -58,9 +58,8 @@ Snipto is designed with **end-to-end encryption (E2EE)** as a first-class princi
     - The IV doubles as the salt in PBKDF2, ensuring the derived key is unique even if the same short secret is reused.
 
 - **Payload Handling:**
-    - Plaintext is encrypted client-side into base64 encoded ciphertext.
+    - Plaintext is encrypted with the randomly generated key and IV client-side into base64 encoded ciphertext.
     - Only the ciphertext and IV are sent to the server.
-    - The server never receives the plaintext or the key.
 
 - **Decryption:**  
   To read a snippet, the recipient must have the full URL including `#k=<secret>`. The secret is extracted from the hash fragment, which is **never transmitted in HTTP requests** (browsers do not send fragments to servers). The browser re-derives the AES key and decrypts the ciphertext locally.
@@ -69,7 +68,7 @@ Snipto is designed with **end-to-end encryption (E2EE)** as a first-class princi
   The client also computes a **SHA-256 hash of the ciphertext** when marking a snippet as “viewed.” This ensures the server only deletes snippets that were successfully decrypted, preventing accidental or malicious premature deletion.
 
 - **Ephemerality:**  
-  Snippets are deleted after the configured number of views or TTL. This ensures encrypted data does not persist indefinitely. Currently the number of view is alwyas 1.
+  Snippets are deleted after the configured number of views or TTL. This ensures encrypted data does not persist indefinitely. Currently, the number of views is always 1.
 
 In short: **the server cannot decrypt your data** — only someone with the full URL (including the secret fragment) can.
 
