@@ -4,7 +4,7 @@
 @section('content')
     <div class="max-w-3xl mx-auto py-12 px-6 text-gray-900 dark:text-gray-100 leading-relaxed">
 
-        <h1 class="text-4xl font-bold mb-10 text-center">Frequently Asked Questions</h1>
+        <h1 class="text-4xl font-bold mb-10 text-center text-indigo-300">Frequently Asked Questions</h1>
 
         <!-- FAQ Index -->
         <div class="mb-12">
@@ -26,7 +26,7 @@
         <div class="space-y-10">
 
             <div id="what-is-snipto">
-                <h2 class="text-xl font-semibold mb-2">What is a Snipto?</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">What is a Snipto?</h2>
                 <p>
                     A Snipto is a small, private snippet of text that you can securely share with someone else. It’s like
                     a tiny secret note that only the people with the full URL and encryption key can read. Once viewed,
@@ -35,7 +35,7 @@
             </div>
 
             <div id="encryption-work">
-                <h2 class="text-xl font-semibold mb-3">How does encryption work?</h2>
+                <h2 class="text-xl font-semibold mb-3 text-indigo-300">How does encryption work?</h2>
                 <p>
                     All encryption and decryption happens <strong>locally in your browser</strong>.
                     When you create a Snipto, your device encrypts the content before it ever leaves
@@ -44,7 +44,7 @@
             </div>
 
             <div id="stored-servers">
-                <h2 class="text-xl font-semibold mb-3">What gets stored on your servers?</h2>
+                <h2 class="text-xl font-semibold mb-3 text-indigo-300">What gets stored on your servers?</h2>
                 <p>
                     We only store the <strong>encrypted form</strong> of your Snipto in our database.
                     This means we never see the plain text. Without the encryption key, the stored data
@@ -53,7 +53,7 @@
             </div>
 
             <div id="encryption-key">
-                <h2 class="text-xl font-semibold mb-2">Where is the encryption key?</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">Where is the encryption key?</h2>
                 <p>
                     The encryption key is included in the URL after the <code>#</code> symbol (called the URL fragment). This part of the URL is <strong>never sent to our servers</strong>, so only you or anyone you share the full URL with can decrypt the Snipto.
                     Each Snipto gets its <strong>own randomly generated encryption key</strong>, and the full URL—including this key—is shown to you immediately after creating the Snipto. Make sure to save or share it, because without full URL, the Snipto cannot be decrypted.
@@ -61,7 +61,7 @@
             </div>
 
             <div id="viewed">
-                <h2 class="text-xl font-semibold mb-3">What happens to my Snipto after it’s viewed?</h2>
+                <h2 class="text-xl font-semibold mb-3 text-indigo-300">What happens to my Snipto after it’s viewed?</h2>
                 <p>
                     Sniptos are <strong>ephemeral by default</strong>. Once decrypted and viewed,
                     they are automatically deleted permanently and cannot be retrieved again.
@@ -69,14 +69,14 @@
             </div>
 
             <div id="never-viewed">
-                <h2 class="text-xl font-semibold mb-3">What happens if my snipto is never viewed?</h2>
+                <h2 class="text-xl font-semibold mb-3 text-indigo-300">What happens if my snipto is never viewed?</h2>
                 <p>
                     If a snipto is never opened, it will be automatically deleted one week after creation.
                 </p>
             </div>
 
             <div id="lost-key">
-                <h2 class="text-xl font-semibold mb-3">What if the decryption key is lost?</h2>
+                <h2 class="text-xl font-semibold mb-3 text-indigo-300">What if the decryption key is lost?</h2>
                 <p>
                     If you lose the key (the <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">#</code> part of the URL), the Snipto cannot be
                     decrypted. Since we never store or know your key, we cannot help you recover it.
@@ -85,7 +85,7 @@
             </div>
 
             <div id="content-types">
-                <h2 class="text-xl font-semibold mb-3">What kinds of content can I store?</h2>
+                <h2 class="text-xl font-semibold mb-3 text-indigo-300">What kinds of content can I store?</h2>
                 <p>
                     Currently, Snipto only supports <strong>plain text snippets</strong>.
                     In the future, we may expand support to other types of content while
@@ -94,7 +94,7 @@
             </div>
 
             <div id="personal-info">
-                <h2 class="text-xl font-semibold mb-2">Is any personal information stored or collected with my Snipto?</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">Is any personal information stored or collected with my Snipto?</h2>
                 <p>
                     No personal identifiable information is stored or collected with your Snipto. We only store the
                     <strong>ciphertext</strong> (your Snipto in encrypted form), the <strong>initialization vector (IV)</strong>, and
@@ -104,7 +104,7 @@
             </div>
 
             <div id="end-to-end">
-                <h2 class="text-xl font-semibold mb-2">How can I be sure my Snipto is end-to-end encrypted?</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">How can I be sure my Snipto is end-to-end encrypted?</h2>
                 <p class="mt-2">
                     All encryption and decryption happens <strong>directly in your browser</strong>. The JavaScript code
                     that performs these operations (snipto.js) is not minified and fully readable for transparency.
@@ -126,7 +126,7 @@
             </div>
 
             <div id="iv">
-                <h2 class="text-xl font-semibold mb-2">What’s an initialization vector (IV)?</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">What’s an initialization vector (IV)?</h2>
                 <p>
                     When your Snipto is encrypted, we don’t just scramble the text in the same way every time. To make
                     it extra secure, a random “starting point” called an initialization vector (IV) is used. Think of

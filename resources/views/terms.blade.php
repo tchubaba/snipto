@@ -3,7 +3,7 @@
 
 @section('content')
     <div class="max-w-3xl mx-auto py-12 px-6 text-gray-900 dark:text-gray-100">
-        <h1 class="text-4xl font-bold mb-8 text-center">Terms of Service</h1>
+        <h1 class="text-4xl font-bold mb-8 text-center text-indigo-300">Terms of Service</h1>
 
         <div class="space-y-8">
 
@@ -19,7 +19,7 @@
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold mb-2">No guarantees</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">No guarantees</h2>
                 <p>
                     While we do our best to keep things safe and private, Snipto is provided
                     <strong>as-is</strong>, for free, with <strong>no warranties</strong> of any kind.
@@ -28,7 +28,7 @@
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold mb-2">Your responsibility</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">Your responsibility</h2>
                 <p>
                     Sniptos are encrypted with a key that only you (or anyone you share the URL with) have.
                     If you lose the key, we cannot help recover your snipto.
@@ -36,7 +36,7 @@
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold mb-2">No liability</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">No liability</h2>
                 <p>
                     By using Snipto, you agree that we <strong>cannot be held responsible</strong> for any
                     damages, losses, or problems that might result from using the service.
@@ -44,7 +44,7 @@
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold mb-2">Ephemeral nature</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">Ephemeral nature</h2>
                 <p>
                     Sniptos are <strong>ephemeral</strong> by default. They will automatically delete once
                     viewed, and unviewed sniptos are deleted after a set period (currently 7 days).
@@ -52,7 +52,7 @@
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold mb-2">Content limitations</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-300">Content limitations</h2>
                 <p>
                     Currently, Snipto only supports <strong>plain text snippets</strong>. Use common sense:
                     do not store illegal content or sensitive information that you wouldn’t want lost.
