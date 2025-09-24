@@ -24,7 +24,7 @@
 
         <div class="space-y-10">
             <div id="what-is-snipto" class="scroll-mt-13">
-                <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-600 dark:text-indigo-300">What is a Snipto?</h2>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-300">What is a Snipto?</h2>
                 <p>
                     A Snipto is a small, private snippet of text that you can securely share with someone else. It’s like
                     a tiny secret note that only the people with the full URL and encryption key can read. Once viewed,
