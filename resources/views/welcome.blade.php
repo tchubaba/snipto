@@ -1,6 +1,6 @@
 @extends('layouts.main')
 
-@section('title', 'Snipto - Encrypted Sharing Made Simple')
+@section('title', 'Snipto - Share your snippets. End-to-end encrypted.')
 
 @section('content')
     <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
