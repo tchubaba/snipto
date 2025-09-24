@@ -12,7 +12,7 @@
                     <source srcset="/images/dark_snipto_logo.png" media="(prefers-color-scheme: dark)">
                     <!-- Light theme image (fallback) -->
                     <img src="/images/light_snipto_logo.png" alt="Snipto"
-                         class="w-11/12 max-w-[1440px] h-auto">
+                         class="w-10/11 max-w-[1440px] h-auto block mx-auto">
                 </picture>
             </div>
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">

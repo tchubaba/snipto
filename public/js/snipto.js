@@ -27,7 +27,7 @@ export function sniptoComponent() {
         showToast: false,   // Toast notification state
         calledInit: false,  // Prevent multiple init calls
         sniptoDisplayFooter: null,  // The footer text in the display snipto footer.
-        footerColorClass: '',
+        footerColorClass: '', // The color for the footer text in the snipto display.
 
         // ------------------------------
         // Initialization (view mode)

@@ -35,7 +35,7 @@
                 <source srcset="/images/dark_snipto_logo.png" media="(prefers-color-scheme: dark)">
                 <!-- Light theme image (fallback) -->
                 <img src="/images/light_snipto_logo.png" alt="Snipto"
-                     class="h-10 sm:h-10 md:h-12 w-auto">
+                     class="h-9 sm:h-9 md:h-11 w-auto">
             </picture>
         </a>
     </div>
