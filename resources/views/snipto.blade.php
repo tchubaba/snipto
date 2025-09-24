@@ -1,5 +1,10 @@
 @extends('layouts.main')
 
+@section('header-js')
+    <script type="module" src="{{ asset('js/snipto.js') }}"></script>
+    @vite(['resources/js/app.js'])
+@endsection
+
 @section('content')
 
     <div class="max-w-4xl w-full rounded-xl p-6 space-y-4
