@@ -19,11 +19,11 @@
         }
     </script>
 
+    <script type="module" src="{{ asset('js/snipto.js') }}"></script>
     @vite([
         'resources/css/app.css',
         'resources/js/app.js'
     ])
-    <script type="module" src="{{ asset('js/snipto.js') }}"></script>
 </head>
 <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col">
 <!-- Header -->
