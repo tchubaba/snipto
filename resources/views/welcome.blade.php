@@ -6,7 +6,15 @@
     <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
         <!-- Hero Section -->
         <div class="space-y-4">
-            <h1 class="text-4xl sm:text-5xl font-extrabold text-indigo-500">Snipto</h1>
+            <div class="flex justify-center">
+                <picture>
+                    <!-- Dark theme image -->
+                    <source srcset="/images/dark_snipto_logo.png" media="(prefers-color-scheme: dark)">
+                    <!-- Light theme image (fallback) -->
+                    <img src="/images/light_snipto_logo.png" alt="Snipto"
+                         class="w-11/12 max-w-[1440px] h-auto">
+                </picture>
+            </div>
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
                 An end-to-end encrypted paste service.<br>
                 Share text securely. No accounts, no hassle.

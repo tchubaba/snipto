@@ -29,8 +29,14 @@
 <!-- Header -->
 <header class="fixed top-0 left-0 w-full border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
     <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-        <a href="/" class="text-xl font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition">
-            Snipto
+        <a href="/" class="flex items-center">
+            <picture>
+                <!-- Dark theme image -->
+                <source srcset="/images/dark_snipto_logo.png" media="(prefers-color-scheme: dark)">
+                <!-- Light theme image (fallback) -->
+                <img src="/images/light_snipto_logo.png" alt="Snipto"
+                     class="h-10 sm:h-10 md:h-12 w-auto">
+            </picture>
         </a>
     </div>
 </header>
