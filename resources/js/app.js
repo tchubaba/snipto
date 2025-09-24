@@ -1,6 +1,6 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
-import { sniptoComponent } from './standalone/snipto.js';
+import { sniptoComponent } from './snipto.js';
 
 window.sniptoComponent = sniptoComponent;
 window.Alpine = Alpine;
