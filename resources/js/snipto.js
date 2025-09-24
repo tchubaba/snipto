@@ -26,6 +26,8 @@ export function sniptoComponent() {
         fullUrl: '',        // Full shareable URL (with key in hash)
         showToast: false,   // Toast notification state
         calledInit: false,  // Prevent multiple init calls
+        sniptoDisplayFooter: null,  // The footer text in the display snipto footer.
+        footerColorClass: '', // The color for the footer text in the snipto display.
 
         // ------------------------------
         // Initialization (view mode)
@@ -50,6 +52,16 @@ export function sniptoComponent() {
                 this.loading = false;
                 this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                 return;
+            }
+
+            if (this.sniptoDisplayFooter === null && this.$refs.sniptoDisplayFooterRef) {
+                // Grab default text from the <p> in the component
+                this.sniptoDisplayFooter = this.$refs.sniptoDisplayFooterRef.textContent.trim();
+            }
+
+            if (!this.footerColorClass && this.$refs.sniptoDisplayFooterRef) {
+                const el = this.$refs.sniptoDisplayFooterRef;
+                this.footerColorClass = el.className; // grabs all classes initially
             }
 
             try {
@@ -108,7 +120,7 @@ export function sniptoComponent() {
                 const hashHex = await this.sha256Hex(new TextEncoder().encode(data.payload));
 
                 // Tell server this Snipto was viewed (without revealing plaintext or key)
-                await fetch(`/api/snipto/${this.slug}/viewed`, {
+                const viewed = await fetch(`/api/snipto/${this.slug}/viewed`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -118,6 +130,16 @@ export function sniptoComponent() {
                     body: JSON.stringify({ payload_hash: hashHex }),
                     credentials: 'same-origin'
                 });
+
+                const viewData = await viewed.json();
+
+                if (viewed.status !== 200) {
+                    this.sniptoDisplayFooter = 'WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).'
+                    this.footerColorClass = 'text-red-600 dark:text-red-400';
+                } else if (viewData.views_remaining !== 0) {
+                    this.sniptoDisplayFooter = 'ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed ' + viewData.views_remaining + ' more times.';
+                    this.footerColorClass = 'text-orange-600 dark:text-orange-400';
+                }
 
             } catch(err) {
                 this.errorMessage = err.message;

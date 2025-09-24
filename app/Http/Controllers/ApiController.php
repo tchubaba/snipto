@@ -101,6 +101,9 @@ class ApiController extends Controller
             $validated['expires_at'] = Carbon::now()->addWeek();
         }
 
+        // Forcing all sniptos to have only one view for now.
+        $validated['views_remaining'] = 1;
+
         try {
             $snipto = Snipto::create($validated);
         } catch (Throwable $t) {

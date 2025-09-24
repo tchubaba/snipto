@@ -31,12 +31,14 @@
             <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
                 Here's your snipto:
             </p>
-            <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm
-                    break-words whitespace-pre-wrap"
+            <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap"
                  x-text="payload">
             </div>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
-                If this is something you want to keep, copy and paste it elsewhere - this Snipto has now been
+            <p x-ref="sniptoDisplayFooterRef"
+               x-text="sniptoDisplayFooter"
+               :class="footerColorClass"
+               class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                If you want to keep this Snipto, copy and paste it elsewhere. It has now been
                 deleted from our servers and cannot be viewed again.
             </p>
         </div>
