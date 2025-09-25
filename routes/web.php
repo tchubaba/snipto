@@ -29,6 +29,21 @@ Route::prefix('api/snipto')->group(function () {
         ->middleware('throttle:20,1');
 });
 
+Route::post('/locale', function (\Illuminate\Http\Request $request) {
+    $locale = $request->input('locale');
+
+    // Get all supported locale keys from config
+    $supportedLocales = array_keys(config('app.supported_locales'));
+
+    if (in_array($locale, $supportedLocales)) {
+        // Set locale cookie with 10-year expiration
+        Cookie::queue('user_locale', $locale, 60 * 24 * 365 * 10);
+    }
+
+    // Redirect back to previous page
+    return back();
+})->name('locale.change');
+
 // ---------------------------
 // Catch-all slug route for viewing/creating snippet
 // ---------------------------

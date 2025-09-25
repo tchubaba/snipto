@@ -3,11 +3,11 @@
 
 @section('content')
     <div class="max-w-3xl mx-auto py-12 px-6 text-gray-900 dark:text-gray-100">
-        <h1 class="text-4xl font-bold mb-8 text-center text-indigo-600 dark:text-indigo-400">Contact Us</h1>
+        <h1 class="text-4xl font-bold mb-8 text-center text-indigo-600 dark:text-indigo-400">{!! ucfirst(__('contact us')) !!}</h1>
 
         <div class="space-y-6 text-lg">
             <p>
-                Have questions, suggestions, or just want to say hello? Drop us a line and we’ll get back to you as soon as possible.
+                {!! __('Have questions, suggestions, or just want to say hello? Drop us a line and we’ll get back to you as soon as possible.') !!}
             </p>
 
             <p>

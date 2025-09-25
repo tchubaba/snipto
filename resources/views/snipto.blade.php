@@ -2,7 +2,22 @@
 
 @section('header-js')
     <script type="module" src="{{ asset('js/snipto.js') }}"></script>
-    @vite(['resources/js/app.js'])
+@endsection
+
+@section('alpine-translations')
+    <script>
+        window.i18n =
+        @php
+        echo json_encode([
+            'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.' => __('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.'),
+            'We can’t open this Snipto. The encryption key is missing in the URL.' => __('We can’t open this Snipto. The encryption key is missing in the URL.'),
+            'We cannot open this Snipto. It appears the encryption key is invalid.' => __('We cannot open this Snipto. It appears the encryption key is invalid.'),
+            'WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).' => __('WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).'),
+            'ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.' => __('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.'),
+            'An error occurred. Please try again.' => __('An error occurred. Please try again.')
+        ]);
+        @endphp
+    </script>
 @endsection
 
 @section('content')
@@ -24,7 +39,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                 </svg>
-                <span class="text-gray-500 dark:text-gray-400">Loading...</span>
+                <span class="text-gray-500 dark:text-gray-400">{!! __('Loading...') !!}</span>
             </div>
         </div>
 
@@ -34,7 +49,7 @@
              class="space-y-4 transform transition-all duration-300 hover:scale-[1.01]">
 
             <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
-                Here's your snipto:
+                {!! __('Here’s your snipto:') !!}
             </p>
             <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap"
                  x-text="payload">
@@ -43,8 +58,7 @@
                x-text="sniptoDisplayFooter"
                :class="footerColorClass"
                class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
-                If you want to keep this Snipto, copy and paste it elsewhere. It has now been
-                deleted from our servers and cannot be viewed again.
+                {!! __('If you want to keep this Snipto, copy and paste it elsewhere. It has now been deleted from our servers and cannot be viewed again.') !!}
             </p>
         </div>
 
@@ -54,9 +68,9 @@
              x-transition.scale.origin.top
              class="space-y-4 transform transition-all duration-300">
             <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
-                Got something to share?
+                {!! __('Got something to share?') !!}
             </p>
-            <textarea x-model="userInput" rows="5" placeholder="Type or paste your text here"
+            <textarea x-model="userInput" rows="5" placeholder="{!! __('Type or paste your text here') !!}"
                       x-ref="textarea"
                       class="w-full border rounded p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none
                      dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200
@@ -66,12 +80,12 @@
                 <button @click="submitSnipto()"
                         class="bg-indigo-500 text-white px-6 py-2 rounded shadow hover:bg-indigo-600
                        hover:shadow-lg transition transform duration-150 active:scale-95">
-                    Snipto it
+                    {!! __('Snipto it') !!}
                 </button>
 
                 <!-- Terms of Service notice -->
                 <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    By using Snipto, you agree with the <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">Terms of Service</a>.
+                    {!! __('By using Snipto, you agree with the') !!} <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{!! __('Terms of Service') !!}</a>.
                 </p>
             </div>
         </div>
@@ -81,7 +95,7 @@
              x-transition.opacity.duration.500ms
              x-transition.scale.origin.top
              class="space-y-4 transform transition-all duration-300">
-            <p class="text-green-600 dark:text-green-400 font-medium">Here's your Snipto:</p>
+            <p class="text-green-600 dark:text-green-400 font-medium">{!! __('Here’s your Snipto:') !!}</p>
             <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
                 <input type="text" :value="fullUrl" readonly
                        x-ref="fullUrlInput"
@@ -90,7 +104,7 @@
                 <button @click="copyUrl()"
                         class="bg-indigo-500 text-white px-3 py-1 rounded shadow hover:bg-indigo-600
                            hover:shadow-md transition transform duration-150 active:scale-95">
-                    Copy
+                    {!! __('Copy') !!}
                 </button>
             </div>
             <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>

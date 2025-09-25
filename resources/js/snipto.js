@@ -76,7 +76,7 @@ export function sniptoComponent() {
                     return;
                 } else if (res.status === 429) {
                     // Rate-limiting protection
-                    this.errorMessage = 'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.';
+                    this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
                     return;
                 }
 
@@ -87,7 +87,7 @@ export function sniptoComponent() {
                 // The short secret is delivered via URL fragment (#k=...) so the server never sees it
                 const shortSecret = new URLSearchParams(window.location.hash.substring(1)).get('k');
                 if (!shortSecret) {
-                    this.errorMessage = 'Missing decryption key in URL.';
+                    this.errorMessage = this.t('We can’t open this Snipto. The encryption key is missing in the URL.');
                     return;
                 }
 
@@ -104,7 +104,7 @@ export function sniptoComponent() {
                 }
 
                 if (!decrypted) {
-                    this.errorMessage = 'Failed to decrypt your snipto. Please check your key.';
+                    this.errorMessage = this.t('We cannot open this Snipto. It appears the encryption key is invalid.');
                     return;
                 }
 
@@ -132,10 +132,10 @@ export function sniptoComponent() {
                 const viewData = await viewed.json();
 
                 if (viewed.status !== 200) {
-                    this.sniptoDisplayFooter = 'WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).'
+                    this.sniptoDisplayFooter = this.t('WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).');
                     this.footerColorClass = 'text-red-600 dark:text-red-400';
                 } else if (viewData.views_remaining !== 0) {
-                    this.sniptoDisplayFooter = 'ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed ' + viewData.views_remaining + ' more times.';
+                    this.sniptoDisplayFooter = this.t('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.', {':count': viewData.views_remaining});
                     this.footerColorClass = 'text-orange-600 dark:text-orange-400';
                 }
 
@@ -191,13 +191,13 @@ export function sniptoComponent() {
                 });
 
                 if (res.status === 429) {
-                    this.errorMessage = 'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.';
+                    this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
                     return;
                 }
 
                 const body = await res.json();
                 if (!res.ok || !body.success) {
-                    this.errorMessage = 'An error occurred. Please try again.';
+                    this.errorMessage = this.t('An error occurred. Please try again.');
                     return;
                 }
 
@@ -211,7 +211,7 @@ export function sniptoComponent() {
                 this.$refs.fullUrlInput.select();
 
             } catch {
-                this.errorMessage = 'An error occurred. Please try again.';
+                this.errorMessage = this.t('An error occurred. Please try again.');
             } finally {
                 this.loading = false;
             }
@@ -389,6 +389,27 @@ export function sniptoComponent() {
         /** Fetch CSRF token from <meta> tag */
         getCsrfToken() {
             return document.querySelector('meta[name="csrf-token"]').content;
+        },
+
+        /**
+         * Translate a string using window.i18n.
+         *
+         * @param {string} englishKey - The original English string.
+         * @param {Object} [replacements] - Optional replacements for placeholders like :count.
+         * @returns {string} Translated string, or fallback to englishKey.
+         */
+        t(englishKey, replacements = []) {
+            if (typeof window === 'undefined') return englishKey;
+            if (!window.i18n) return englishKey;
+
+            let str = window.i18n[englishKey] ?? englishKey;
+
+            // Simple placeholder replacement
+            for (const [key, value] of Object.entries(replacements)) {
+                str = str.replace(new RegExp(key, 'g'), value);
+            }
+
+            return str;
         }
     }
 }
