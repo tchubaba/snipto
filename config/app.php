@@ -87,6 +87,9 @@ return [
     'supported_locales' => [
         'en'    => ['name' => 'English', 'flag' => 'us'],
         'pt_BR' => ['name' => 'Português', 'flag' => 'br'],
+        'es'    => ['name' => 'Español (AI)', 'flag' => 'es'],
+        'fr'    => ['name' => 'Français (AI)', 'flag' => 'fr'],
+        'de'    => ['name' => 'Deutsch (AI)', 'flag' => 'de'],
     ],
 
     /*
