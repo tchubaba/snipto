@@ -67,5 +67,9 @@
     "We cannot open this Snipto. It appears the encryption key is invalid.": "Não pudemos abrir este Snipto. A chave de criptografia parece ser inválida.",
     "WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).": "ATENÇÃO: A remoção automática deste Snipto falhou! Ele permanecerá visível até expirar (1 semana após a criação).",
     "ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.": "ATENÇÃO: Este Snipto foi configurado para ser visto mais de uma vez. Ele ainda pode ser visualizado :count vez(es).",
-    "An error occurred. Please try again.": "Ocorreu um erro. Por favor, tente novamente."
+    "An error occurred. Please try again.": "Ocorreu um erro. Por favor, tente novamente.",
+    "Oops! That’s not a valid snipto!": "Opa! Isso não é um snipto válido!",
+    "Snipto URLs can only contain": "As URLs do snipto podem conter somente",
+    "letters and numbers (A–Z, 0–9)": "letras e números (A-Z, 0-9)",
+    "Back to Home": "Voltar à home page"
 }

@@ -13,7 +13,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $slug
  * @property string $payload
- * @property string $iv
+ * @property string $key_hash
+ * @property string $plaintext_hmac
+ * @property string $nonce
  * @property int|null $views_remaining
  * @property Carbon $expires_at
  * @property Carbon|null $created_at
@@ -22,7 +24,9 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder|Snipto whereId($value)
  * @method static Builder|Snipto whereSlug($value)
  * @method static Builder|Snipto wherePayload($value)
- * @method static Builder|Snipto whereIv($value)
+ * @method static Builder|Snipto whereKeyHash($value)
+ * @method static Builder|Snipto wherePlaintextHmac($value)
+ * @method static Builder|Snipto whereNonce($value)
  * @method static Builder|Snipto whereViewsRemaining($value)
  * @method static Builder|Snipto whereExpiresAt($value)
  * @method static Builder|Snipto whereCreatedAt($value)
@@ -39,7 +43,9 @@ class Snipto extends Model
     protected $fillable = [
         'slug',
         'payload',
-        'iv',
+        'key_hash',
+        'plaintext_hmac',
+        'nonce',
         'views_remaining',
         'expires_at',
     ];
@@ -47,7 +53,9 @@ class Snipto extends Model
     protected $casts = [
         'slug'            => 'string',
         'payload'         => 'string',
-        'iv'              => 'string',
+        'key_hash'        => 'string',
+        'plaintext_hmac'  => 'string',
+        'nonce'           => 'string',
         'views_remaining' => 'integer',
         'expires_at'      => 'datetime',
     ];

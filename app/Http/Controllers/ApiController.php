@@ -32,13 +32,16 @@ class ApiController extends Controller
      *
      * @return JsonResponse A structured JSON response containing the requested data or an error message.
      */
-    public function show(string $slug): JsonResponse
+    public function show(string $slug, Request $request): JsonResponse
     {
+        $keyHash = $request->input('key_hash');
+
         $snipto = Snipto::where('slug', $slug)->first();
 
         if ( ! $snipto) {
             return response()->json([
                 'success' => false,
+                'exists'  => false,
                 'message' => 'Snipto not found',
             ], 404);
         }
@@ -51,13 +54,27 @@ class ApiController extends Controller
             ], 410);
         }
 
-        return response()->json([
+        if ( ! empty($keyHash) && $snipto->key_hash !== $keyHash) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Key Hash invalid.',
+            ], 403);
+        }
+
+        $response = [
             'success'         => true,
-            'payload'         => $snipto->payload,
-            'iv'              => $snipto->iv,
+            'exists'          => true,
             'views_remaining' => $snipto->views_remaining,
             'expires_at'      => $snipto->expires_at,
-        ]);
+        ];
+
+        if ( ! empty($keyHash)) {
+            $response['payload']        = $snipto->payload;
+            $response['plaintext_hmac'] = $snipto->plaintext_hmac;
+            $response['nonce']          = $snipto->nonce;
+        }
+
+        return response()->json($response);
     }
 
     /**
@@ -84,7 +101,9 @@ class ApiController extends Controller
         $validator = Validator::make($request->all(), [
             'slug'            => 'required|string|max:100|unique:sniptos,slug',
             'payload'         => 'required|string|min:1',
-            'iv'              => 'required|string',
+            'key_hash'        => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
+            'plaintext_hmac'  => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
+            'nonce'           => 'required|string|size:24|regex:/^[0-9a-fA-F]+$/',
             'views_remaining' => 'nullable|integer|min:1|max:200',
             'expires_at'      => 'nullable|date|after:now', // TODO: perhaps use pre-defined values like 1 day, 1 week, etc
         ]);
@@ -96,10 +115,11 @@ class ApiController extends Controller
             ], 422);
         }
 
+        // Forcing expiration date to always be 1 week from now.
         $validated = $validator->validated();
-        if (empty($validated['expires_at'])) {
-            $validated['expires_at'] = Carbon::now()->addWeek();
-        }
+        //        if (empty($validated['expires_at'])) {
+        $validated['expires_at'] = Carbon::now()->addWeek();
+        //        }
 
         // Forcing all sniptos to have only one view for now.
         $validated['views_remaining'] = 1;
@@ -120,6 +140,7 @@ class ApiController extends Controller
 
         return response()->json([
             'success' => true,
+            'slug'    => $snipto->slug,
         ]);
     }
 
@@ -148,7 +169,7 @@ class ApiController extends Controller
     public function markViewed(string $slug, Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'payload_hash' => 'required|string|size:64',
+            'plaintext_hmac' => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
         ]);
 
         if ($validator->fails()) {
@@ -167,8 +188,8 @@ class ApiController extends Controller
             ], 404);
         }
 
-        if ($snipto->getPayloadHash()
-            !== $request->input('payload_hash')
+        if ($snipto->plaintext_hmac
+            !== $request->input('plaintext_hmac')
         ) {
             return response()->json([
                 'success' => false,

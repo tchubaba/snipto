@@ -8,18 +8,18 @@
         <div class="space-y-4">
             <h1 class="text-6xl sm:text-7xl font-extrabold text-indigo-500">404</h1>
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
-                Oops! That’s not a valid snipto!
+                {!! __('Oops! That’s not a valid snipto!') !!}
             </p>
         </div>
 
         <!-- Call to Action -->
         <div class="space-y-4">
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
-                Snipto URLs can only contain <span class="font-bold">letters and numbers (A–Z, 0–9)</span>.
+                {!! __('Snipto URLs can only contain') !!} <span class="font-bold">{!! __('letters and numbers (A–Z, 0–9)') !!}</span>.
             </p>
             <div>
                 <a href="/" class="inline-block bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 transition font-bold text-lg">
-                    Back to Home
+                    {!! __('Back to Home') !!}
                 </a>
             </div>
         </div>

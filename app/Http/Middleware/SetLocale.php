@@ -34,9 +34,6 @@ class SetLocale
 
         App::setLocale($locale);
 
-        // Queue the locale cookie with a 10-year expiration (5256000 minutes)
-//        \cookie('user_locale', $locale);
-
         return $next($request);
     }
 }

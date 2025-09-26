@@ -46,31 +46,56 @@
 ---
 
 ## Security Notes
+Snipto is designed with end-to-end encryption (E2EE) as a core principle, ensuring that sensitive data remains confidential and secure. All encryption and decryption operations occur client-side in the browser using the Web Crypto API, with the server handling only encrypted data and metadata. Below is a technical overview of how Snipto achieves secure, ephemeral snippet sharing.
 
-Snipto is designed with **end-to-end encryption (E2EE)** as a first-class principle. Here’s how it works technically:
+### Encryption Algorithm
+Snippets are encrypted using AES-256 in Galois/Counter Mode (AES-GCM) via the browser’s Web Crypto API. AES-GCM provides both confidentiality and integrity, ensuring that encrypted data cannot be tampered with without detection. A 12-byte nonce (initialization vector) is randomly generated for each snippet to ensure uniqueness of encryption.
 
-- **Encryption Algorithm:**  
-  Snippets are encrypted using **AES-256 in CBC mode** via the browser’s [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API).
+### Key Derivation
+A random, 16-character alphanumeric “short secret” is generated client-side using the browser’s cryptographically secure random number generator. This secret, passed in the URL fragment (e.g., `#k=<secret>`), is never sent to the server. The browser derives three 256-bit keys from the secret using PBKDF2-HMAC-SHA256 with 100,000 iterations:
 
-- **Key Derivation:**  
-  A short, random alphanumeric “secret” is generated in the browser. This secret is never sent to the server. The browser derives a 256-bit AES key from it using **PBKDF2-HMAC-SHA256** with 100,000 iterations.
-    - The **Initialization Vector (IV)** is also randomly generated per snippet.
-    - The IV doubles as the salt in PBKDF2, ensuring the derived key is unique even if the same short secret is reused.
+- **Encryption Key**: Used for AES-GCM encryption and decryption of the snippet.
+- **Ciphertext HMAC Key**: Used to compute an HMAC-SHA256 over the ciphertext, authentication tag, and nonce for additional integrity protection.
+- **Plaintext HMAC Key**: Used to compute an HMAC-SHA256 over the plaintext, enabling secure view verification.
 
-- **Payload Handling:**
-    - Plaintext is encrypted with the randomly generated key and IV client-side into base64 encoded ciphertext.
-    - Only the ciphertext and IV are sent to the server.
+The nonce doubles as the salt for PBKDF2 (with a unique suffix for the plaintext HMAC key), ensuring that derived keys are unique even if the same short secret is reused.
 
-- **Decryption:**  
-  To read a snippet, the recipient must have the full URL including `#k=<secret>`. The secret is extracted from the hash fragment, which is **never transmitted in HTTP requests** (browsers do not send fragments to servers). The browser re-derives the AES key and decrypts the ciphertext locally.
+### Payload Handling
+- **Encryption**: The plaintext snippet is encrypted client-side using AES-GCM with the derived encryption key and nonce. An HMAC-SHA256 is computed over the ciphertext, authentication tag, and nonce using the ciphertext HMAC key. The combined payload (ciphertext + 16-byte authentication tag + 32-byte HMAC) is base64-encoded and sent to the server along with the nonce.
+- **Server Storage**: The server stores only the encrypted payload, nonce, and metadata (e.g., expiration time, remaining views). It never receives the plaintext or short secret.
+- **Access Control**: A SHA-256 hash of the short secret (`key_hash`) is sent to the server during snippet creation and stored. This hash is required to retrieve the encrypted payload, preventing unauthorized access.
 
-- **Integrity Verification:**  
-  The client also computes a **SHA-256 hash of the ciphertext** when marking a snippet as “viewed.” This ensures the server only deletes snippets that were successfully decrypted, preventing accidental or malicious premature deletion.
+### Decryption
+To read a snippet, the recipient must access the full URL, including the fragment (e.g., `snipto.com/<slug>#k=<secret>`). The browser:
 
-- **Ephemerality:**  
-  Snippets are deleted after the configured number of views or TTL. This ensures encrypted data does not persist indefinitely. Currently, the number of views is always 1.
+1. Extracts the short secret from the URL fragment, which is never sent to the server (per browser URL handling).
+2. Computes the SHA-256 hash of the secret (`key_hash`) and sends it in the `GET /api/snipto/<slug>?key_hash=...` request to retrieve the encrypted payload.
+3. Derives the encryption and HMAC keys using PBKDF2.
+4. Verifies the ciphertext HMAC and decrypts the payload using AES-GCM, ensuring both confidentiality and integrity.
 
-In short: **the server cannot decrypt your data** — only someone with the full URL (including the secret fragment) can.
+If the URL fragment is missing, the server returns only metadata (e.g., whether the slug exists, expiration time, remaining views), prompting the user to provide the secret. If the slug does not exist, the client displays a form to create a new snippet.
+
+### Integrity and View Verification
+- **Ciphertext Integrity**: AES-GCM’s authentication tag and the additional HMAC-SHA256 ensure that any tampering with the ciphertext or nonce is detected, preventing display of corrupted data.
+- **View Verification**: After successful decryption, the client computes an HMAC-SHA256 of the plaintext using the plaintext HMAC key and sends it to the server via `POST /api/snipto/<slug>/viewed`. The server verifies this against the stored `plaintext_hmac` to confirm decryption, preventing unauthorized view consumption or premature deletion. This eliminates risks like dictionary attacks on low-entropy plaintexts, as the HMAC is keyed with the secret.
+
+## Ephemerality
+Snippets are ephemeral, automatically deleted after a configured number of views (default: 1) or a time-to-live (TTL, default: 1 week). The server decrements the view count only after verifying the plaintext HMAC, ensuring that only successful decryptions consume views. Expired or fully viewed snippets are inaccessible and removed from the server.
+
+### Slug Existence Checking
+When a user visits `snipto.com/<slug>` without a key, the client checks if the slug exists by sending a `GET /api/snipto/<slug>` request without a `key_hash`. The server returns minimal metadata (e.g., `exists: true`, expiration, views remaining) if the slug exists, prompting for the key, or a 404 if it does not, allowing creation of a new snippet. This preserves usability while protecting the encrypted payload behind the `key_hash`.
+
+### Security Features
+- **End-to-End Encryption**: The server never sees the plaintext or short secret, ensuring only users with the full URL can decrypt snippets.
+- **Access Control**: The `key_hash` requirement prevents unauthorized access to encrypted payloads, reducing the risk of data exposure.
+- **Tamper Resistance**: AES-GCM and HMAC-SHA256 ensure data integrity, detecting any modifications to the ciphertext or nonce.
+- **Fishing Mitigation**: Server-side rate-limiting prevents brute-force slug enumeration. Keyless GET requests reveal only metadata, not the encrypted payload.
+- **Secure Key Handling**: The short secret (16 chars, ~95 bits entropy) is high-entropy and processed only client-side. URL fragments avoid server transmission, though users are advised to share URLs securely to prevent leakage via browser history or extensions.
+
+---
+
+In summary, Snipto ensures that only users with the full URL (including the secret fragment) can access and decrypt snippets, with robust encryption, integrity checks, and access controls. The server handles only encrypted data and metadata, maintaining E2EE and ephemerality for secure, temporary sharing.
+
 
 ---
 

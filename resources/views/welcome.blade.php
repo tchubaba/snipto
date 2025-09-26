@@ -2,6 +2,34 @@
 
 @section('title', 'Snipto - Share your snippets. End-to-end encrypted.')
 
+@section('footer-js')
+    <script>
+        function goToSnipto(e) {
+            e.preventDefault();
+            const slugInput = document.getElementById('slugInput');
+            const slug = slugInput.value.trim();
+            const toast = document.getElementById('toast');
+            const alphanumericRegex = /^[a-zA-Z0-9]+$/;
+
+            if (slug && alphanumericRegex.test(slug)) {
+                window.location.href = '/' + slug;
+            } else {
+                // Show toast notification
+                toast.classList.remove('hidden', 'opacity-0');
+                toast.classList.add('opacity-100');
+
+                // Auto-hide toast after 3 seconds
+                setTimeout(() => {
+                    toast.classList.remove('opacity-100');
+                    toast.classList.add('opacity-0');
+                    setTimeout(() => toast.classList.add('hidden'), 300);
+                }, 3000);
+            }
+            return false;
+        }
+    </script>
+@endsection
+
 @section('content')
     <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
         <!-- Hero Section -->
@@ -54,29 +82,4 @@
         </div>
     </div>
 
-    <script>
-        function goToSnipto(e) {
-            e.preventDefault();
-            const slugInput = document.getElementById('slugInput');
-            const slug = slugInput.value.trim();
-            const toast = document.getElementById('toast');
-            const alphanumericRegex = /^[a-zA-Z0-9]+$/;
-
-            if (slug && alphanumericRegex.test(slug)) {
-                window.location.href = '/' + slug;
-            } else {
-                // Show toast notification
-                toast.classList.remove('hidden', 'opacity-0');
-                toast.classList.add('opacity-100');
-
-                // Auto-hide toast after 3 seconds
-                setTimeout(() => {
-                    toast.classList.remove('opacity-100');
-                    toast.classList.add('opacity-0');
-                    setTimeout(() => toast.classList.add('hidden'), 300);
-                }, 3000);
-            }
-            return false;
-        }
-    </script>
 @endsection
