@@ -167,7 +167,7 @@ export function sniptoComponent() {
 
             const encrypted = await this.encryptPayload(this.userInput, this.key, this.nonce, this.hmacKey);
 
-            const secretHash = await this.sha256Hex(new TextEncoder().encode(shortSecret));
+            let secretHash = await this.sha256Hex(new TextEncoder().encode(shortSecret));
             const plaintextHmac = await crypto.subtle.sign(
                 { name: 'HMAC' },
                 this.plaintextHmacKey,
@@ -210,6 +210,9 @@ export function sniptoComponent() {
                 this.showForm = false;
                 this.showSuccess = true;
                 this.fullUrl = `${window.location.origin}/${this.slug}#k=${shortSecret}`;
+                this.sniptoDisplayFooter = this.t('This snipto will expire in 1 hour if not viewed.');
+                this.userInput = null;
+                secretHash = null;
                 QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
                 this.$refs.fullUrlInput.select();
             } catch {

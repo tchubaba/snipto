@@ -69,9 +69,8 @@ class ApiController extends Controller
         ];
 
         if ( ! empty($keyHash)) {
-            $response['payload']        = $snipto->payload;
-            $response['plaintext_hmac'] = $snipto->plaintext_hmac;
-            $response['nonce']          = $snipto->nonce;
+            $response['payload'] = $snipto->payload;
+            $response['nonce']   = $snipto->nonce;
         }
 
         return response()->json($response);
@@ -118,7 +117,7 @@ class ApiController extends Controller
         // Forcing expiration date to always be 1 week from now.
         $validated = $validator->validated();
         //        if (empty($validated['expires_at'])) {
-        $validated['expires_at'] = Carbon::now()->addWeek();
+        $validated['expires_at'] = Carbon::now()->addHour();
         //        }
 
         // Forcing all sniptos to have only one view for now.

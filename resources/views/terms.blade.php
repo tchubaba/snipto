@@ -40,7 +40,7 @@
             <div>
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Ephemeral nature') !!}</h2>
                 <p>
-                    {!! __('Sniptos are <strong>ephemeral</strong> by default. They will automatically delete once viewed, and unviewed sniptos are deleted after a set period (currently 7 days).') !!}
+                    {!! __('Sniptos are <strong>ephemeral</strong> by default. They will automatically delete once viewed, and unviewed sniptos are deleted after a set period (currently 1 hour).') !!}
                 </p>
             </div>
 

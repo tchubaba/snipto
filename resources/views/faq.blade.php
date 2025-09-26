@@ -64,7 +64,7 @@
             <div id="never-viewed" class="scroll-mt-13">
                 <h2 class="text-xl font-semibold mb-3 text-indigo-600 dark:text-indigo-400">{!! __('What happens if my snipto is never viewed?') !!}</h2>
                 <p>
-                    {!! __('If a snipto is never opened, it will be automatically deleted one week after creation.') !!}
+                    {!! __('If a snipto is never opened, it will be automatically deleted one hour after creation. Sniptos are meant to be created, shared and consumed shortly after creation. The short time to live helps mitigate data compromise.') !!}
                 </p>
             </div>
 
