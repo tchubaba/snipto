@@ -123,11 +123,16 @@ export function sniptoComponent() {
                     .map(b => b.toString(16).padStart(2, '0'))
                     .join('');
 
-                this.payload = decrypted.trim();
+                const decryptedText = decrypted.trim();
+
+                // Render payload using vanilla JS with polling
+                this.renderPayload(decryptedText);
+
                 this.expires_at = data.expires_at;
                 this.views_remaining = data.views_remaining - 1;
                 this.showPayload = true;
 
+                // Notify server of view
                 const viewed = await fetch(`/api/snipto/${this.slug}/viewed`, {
                     method: 'POST',
                     headers: {
@@ -147,11 +152,54 @@ export function sniptoComponent() {
                     this.sniptoDisplayFooter = this.t('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.', { ':count': viewData.views_remaining });
                     this.footerColorClass = 'text-orange-600 dark:text-orange-400';
                 }
+
+                this.clearSensitiveRetrieval();
             } catch (err) {
                 this.errorMessage = err.message;
             } finally {
                 this.loading = false;
             }
+        },
+
+        renderPayload(decrypted) {
+            const tryRender = () => {
+                const payloadDisplay = document.querySelector('#snipto-payload-display');
+                if (payloadDisplay) {
+                    payloadDisplay.textContent = decrypted;
+                    this.clearSensitiveRetrieval();
+                } else {
+                    let attempts = 0;
+                    const maxAttempts = 10;
+                    const pollInterval = setInterval(() => {
+                        const element = document.querySelector('#snipto-payload-display');
+                        if (element) {
+                            element.textContent = decrypted;
+                            this.clearSensitiveRetrieval();
+                            clearInterval(pollInterval);
+                        } else if (attempts >= maxAttempts) {
+                            this.errorMessage = this.t('Failed to find display element.');
+                            console.error('Failed to find #snipto-payload-display after retries');
+                            clearInterval(pollInterval);
+                        }
+                        attempts++;
+                    }, 100); // Poll every 100ms
+                }
+            };
+
+            // Wait for DOM to be ready
+            if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                tryRender();
+            } else {
+                document.addEventListener('DOMContentLoaded', tryRender);
+            }
+        },
+
+        clearSensitiveRetrieval() {
+            this.key = null;
+            this.hmacKey = null;
+            this.plaintextHmacKey = null;
+            this.nonce = null;
+            this.payload = null; // Redundant but harmless
         },
 
         async submitSnipto() {
@@ -167,7 +215,7 @@ export function sniptoComponent() {
 
             const encrypted = await this.encryptPayload(this.userInput, this.key, this.nonce, this.hmacKey);
 
-            let secretHash = await this.sha256Hex(new TextEncoder().encode(shortSecret));
+            const secretHash = await this.sha256Hex(new TextEncoder().encode(shortSecret));
             const plaintextHmac = await crypto.subtle.sign(
                 { name: 'HMAC' },
                 this.plaintextHmacKey,
@@ -210,16 +258,24 @@ export function sniptoComponent() {
                 this.showForm = false;
                 this.showSuccess = true;
                 this.fullUrl = `${window.location.origin}/${this.slug}#k=${shortSecret}`;
-                this.sniptoDisplayFooter = this.t('This snipto will expire in 1 hour if not viewed.');
-                this.userInput = null;
-                secretHash = null;
                 QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
                 this.$refs.fullUrlInput.select();
+
+                // Clear sensitive data after creation
+                this.clearSensitiveCreation();
             } catch {
                 this.errorMessage = this.t('An error occurred. Please try again.');
             } finally {
                 this.loading = false;
             }
+        },
+
+        clearSensitiveCreation() {
+            this.userInput = null;
+            this.key = null;
+            this.hmacKey = null;
+            this.plaintextHmacKey = null;
+            this.nonce = null;
         },
 
         generateShortSecret(length) {

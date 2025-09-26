@@ -8,14 +8,16 @@
     <script>
         window.i18n =
         @php
-        echo json_encode([
-            'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.' => __('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.'),
-            'We can’t open this Snipto. The encryption key is missing in the URL.' => __('We can’t open this Snipto. The encryption key is missing in the URL.'),
-            'We cannot open this Snipto. It appears the encryption key is invalid.' => __('We cannot open this Snipto. It appears the encryption key is invalid.'),
-            'WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).' => __('WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).'),
-            'ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.' => __('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.'),
-            'An error occurred. Please try again.' => __('An error occurred. Please try again.')
-        ]);
+            echo json_encode([
+                'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.' => __('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.'),
+                'We can’t open this Snipto. The encryption key is missing in the URL.' => __('We can’t open this Snipto. The encryption key is missing in the URL.'),
+                'We cannot open this Snipto. It appears the encryption key is invalid.' => __('We cannot open this Snipto. It appears the encryption key is invalid.'),
+                'WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).' => __('WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).'),
+                'ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.' => __('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.'),
+                'An error occurred. Please try again.' => __('An error occurred. Please try again.'),
+                'Failed to render snipto content. Please copy it manually.' => __('Failed to render snipto content. Please copy it manually.'),
+                'Failed to find display element.' => __('Failed to find display element.')
+            ]);
         @endphp
     </script>
 @endsection
@@ -51,9 +53,9 @@
             <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
                 {!! __('Here’s your snipto:') !!}
             </p>
-            <div class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap"
-                 x-text="payload">
-            </div>
+            <pre id="snipto-payload-display"
+                 class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap">
+            </pre>
             <p x-ref="sniptoDisplayFooterRef"
                x-text="sniptoDisplayFooter"
                :class="footerColorClass"
