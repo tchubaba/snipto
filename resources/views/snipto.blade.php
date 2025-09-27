@@ -1,7 +1,7 @@
 @extends('layouts.main')
 
 @section('header-js')
-    <script type="module" src="{{ asset('js/snipto.js') }}"></script>
+    <script type="module" src="{{ asset('build/js/snipto.js') }}?v={{ filemtime(public_path('build/js/snipto.js')) }}"></script>
 @endsection
 
 @section('alpine-translations')
