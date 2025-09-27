@@ -54,9 +54,9 @@
             <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
                 {!! __('Here’s your snipto:') !!}
             </p>
-            <pre id="snipto-payload-display"
+            <div id="snipto-payload-container"
                  class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap">
-            </pre>
+            </div>
             <p x-ref="sniptoDisplayFooterRef"
                x-text="sniptoDisplayFooter"
                :class="footerColorClass"

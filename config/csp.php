@@ -17,11 +17,12 @@ return [
      * Register additional global CSP directives here.
      */
     'directives' => [
-        [Directive::FRAME, [Keyword::NONE]],
+        [Directive::FRAME, [Keyword::SELF]],
         [Directive::FORM_ACTION, [Keyword::SELF]],
         [Directive::FRAME_ANCESTORS, [Keyword::NONE]], // Prevents app from being embedded in external <iframe>
         [Directive::DEFAULT, [Keyword::NONE]],
         [Directive::REQUIRE_TRUSTED_TYPES_FOR, [Keyword::SCRIPT]],
+        [Directive::MANIFEST, [Keyword::SELF]],
     ],
 
     /*

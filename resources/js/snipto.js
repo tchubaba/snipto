@@ -25,6 +25,13 @@ export function sniptoComponent() {
             if (this.calledInit) return;
             this.calledInit = true;
 
+            // Initialize Trusted Types policy for srcdoc
+            if (window.trustedTypes && trustedTypes.createPolicy) {
+                this.trustedTypesPolicy = trustedTypes.createPolicy('snipto-srcdoc', {
+                    createHTML: (input) => input // Input is already escaped via escapeHtml
+                });
+            }
+
             if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                 document.documentElement.classList.add('dark');
             }
@@ -125,7 +132,7 @@ export function sniptoComponent() {
 
                 const decryptedText = decrypted.trim();
 
-                // Render payload using vanilla JS with polling
+                // Render payload
                 this.renderPayload(decryptedText);
 
                 this.expires_at = data.expires_at;
@@ -163,26 +170,99 @@ export function sniptoComponent() {
 
         renderPayload(decrypted) {
             const tryRender = () => {
-                const payloadDisplay = document.querySelector('#snipto-payload-display');
-                if (payloadDisplay) {
-                    payloadDisplay.textContent = decrypted;
+                const container = document.querySelector('#snipto-payload-container');
+                if (container) {
+                    // Clear any existing content using replaceChildren
+                    container.replaceChildren();
+
+                    // Escape the text to prevent HTML interpretation
+                    const escapedText = this.escapeHtml(decrypted);
+
+                    // Get nonce from meta tag
+                    const nonce = document.querySelector('meta[name="csp-nonce"]')?.content ||
+                        document.querySelector('meta[name="csrf-token"]')?.getAttribute('nonce') ||
+                        '';
+
+                    // Detect theme for text color
+                    const isDark = document.documentElement.classList.contains('dark');
+                    const textColor = isDark ? '#f3f4f6' : '#111827'; // text-gray-100 or text-gray-900
+
+                    // Create temp element to measure height (minimal styles)
+                    const tempPre = document.createElement('pre');
+                    tempPre.style.position = 'absolute';
+                    tempPre.style.visibility = 'hidden';
+                    tempPre.style.padding = '0';
+                    tempPre.style.margin = '0';
+                    tempPre.style.fontSize = '16px'; // text-base
+                    tempPre.style.whiteSpace = 'pre-wrap';
+                    tempPre.style.overflowWrap = 'anywhere';
+                    tempPre.style.wordBreak = 'break-word';
+                    tempPre.style.color = textColor; // Match iframe text color
+                    tempPre.textContent = decrypted;
+                    document.body.appendChild(tempPre);
+                    const height = tempPre.offsetHeight;
+                    document.body.removeChild(tempPre);
+
+                    // Build srcdoc with minimal styles
+                    const srcdoc = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <style nonce="${nonce}">
+                                body {
+                                    margin: 0;
+                                    padding: 0;
+                                    font-family: inherit;
+                                    color: ${textColor}; /* Explicitly set for theme */
+                                    background-color: transparent;
+                                }
+                                pre {
+                                    margin: 0;
+                                    padding: 0;
+                                    font-size: 16px; /* text-base */
+                                    white-space: pre-wrap;
+                                    overflow-wrap: anywhere;
+                                    word-break: break-word;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <pre>${escapedText}</pre>
+                        </body>
+                        </html>
+                    `;
+
+                    // Create sandboxed iframe
+                    const iframe = document.createElement('iframe');
+                    iframe.sandbox = ''; // Strict sandbox
+                    // Use Trusted Types for srcdoc if available
+                    iframe.srcdoc = this.trustedTypesPolicy
+                        ? this.trustedTypesPolicy.createHTML(srcdoc)
+                        : srcdoc;
+                    iframe.style.width = '100%';
+                    iframe.style.height = `${height}px`; // Auto-fit
+                    iframe.style.border = 'none';
+                    iframe.style.backgroundColor = 'transparent';
+
+                    // Append to container
+                    container.appendChild(iframe);
+
                     this.clearSensitiveRetrieval();
                 } else {
                     let attempts = 0;
                     const maxAttempts = 10;
                     const pollInterval = setInterval(() => {
-                        const element = document.querySelector('#snipto-payload-display');
+                        const element = document.querySelector('#snipto-payload-container');
                         if (element) {
-                            element.textContent = decrypted;
-                            this.clearSensitiveRetrieval();
+                            tryRender();
                             clearInterval(pollInterval);
                         } else if (attempts >= maxAttempts) {
                             this.errorMessage = this.t('Failed to find display element.');
-                            console.error('Failed to find #snipto-payload-display after retries');
+                            console.error('Failed to find #snipto-payload-container after retries');
                             clearInterval(pollInterval);
                         }
                         attempts++;
-                    }, 100); // Poll every 100ms
+                    }, 100);
                 }
             };
 
@@ -194,12 +274,21 @@ export function sniptoComponent() {
             }
         },
 
+        escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        },
+
         clearSensitiveRetrieval() {
             this.key = null;
             this.hmacKey = null;
             this.plaintextHmacKey = null;
             this.nonce = null;
-            this.payload = null; // Redundant but harmless
+            this.payload = null;
         },
 
         async submitSnipto() {
@@ -261,7 +350,6 @@ export function sniptoComponent() {
                 QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
                 this.$refs.fullUrlInput.select();
 
-                // Clear sensitive data after creation
                 this.clearSensitiveCreation();
             } catch {
                 this.errorMessage = this.t('An error occurred. Please try again.');
