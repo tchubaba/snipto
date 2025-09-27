@@ -57,7 +57,7 @@ export function sniptoComponent() {
                         this.showForm = true;
                         this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                     } else if (res.status === 429) {
-                        this.errorMessage = this.t('Rate limit exceeded. Try again later.');
+                        this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
                     } else if (res.status === 200) {
                         const data = await res.json();
                         if (data.exists) {
@@ -67,10 +67,10 @@ export function sniptoComponent() {
                             this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                         }
                     } else {
-                        this.errorMessage = this.t('Error checking snipto.');
+                        this.errorMessage = this.t('An error occurred. Please try again.');
                     }
                 } catch {
-                    this.errorMessage = this.t('Error checking snipto.');
+                    this.errorMessage = this.t('An error occurred. Please try again.');
                 } finally {
                     this.loading = false;
                 }
@@ -89,14 +89,14 @@ export function sniptoComponent() {
                     this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                     return;
                 } else if (res.status === 429) {
-                    this.errorMessage = this.t('Rate limit exceeded. Try again later.');
+                    this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
                     return;
                 } else if (res.status === 403) {
-                    this.errorMessage = this.t('Invalid encryption key hash. Access denied.');
+                    this.errorMessage = this.t('We cannot open this Snipto. It appears the encryption key is invalid.');
                     return;
                 }
 
-                if (!res.ok) throw new Error('Error fetching snipto');
+                if (!res.ok) throw new Error(this.t('An error occurred. Please try again.'));
 
                 const data = await res.json();
 
@@ -110,7 +110,7 @@ export function sniptoComponent() {
                 try {
                     decrypted = await this.decryptPayload(data.payload, this.key, this.nonce, this.hmacKey);
                 } catch {
-                    this.errorMessage = this.t('Decryption failed or data tampered.');
+                    this.errorMessage = this.t('Could not decrypt the Snipto. Decryption failed or data tampered.');
                     return;
                 }
 

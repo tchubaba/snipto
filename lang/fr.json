@@ -67,5 +67,11 @@
     "We cannot open this Snipto. It appears the encryption key is invalid.": "Impossible d’ouvrir ce Snipto. La clé de chiffrement semble invalide.",
     "WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).": "ATTENTION : la suppression automatique de ce Snipto a échoué ! Il restera visible jusqu’à son expiration (1 semaine après sa création).",
     "ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.": "ATTENTION : ce Snipto a été configuré pour être consulté plusieurs fois. Il peut encore être consulté :count fois.",
-    "An error occurred. Please try again.": "Une erreur est survenue. Veuillez réessayer."
+    "An error occurred. Please try again.": "Une erreur est survenue. Veuillez réessayer.",
+    "Oops! That’s not a valid snipto!": "Oups ! Ce Snipto n’est pas valide !",
+    "Snipto URLs can only contain": "Les URLs de Snipto ne peuvent contenir que",
+    "letters and numbers (A–Z, 0–9)": "des lettres et des chiffres (A–Z, 0–9)",
+    "Back to Home": "Retour à l’accueil",
+    "Your Snipto will be available for retrieval for the next hour. After that, it will be deleted automatically.": "Votre Snipto sera disponible pendant une heure. Passé ce délai, il sera supprimé automatiquement.",
+    "Could not decrypt the Snipto. Decryption failed or data tampered.": "Impossible d’ouvrir ce Snipto — le déchiffrement a échoué ou les données ont peut-être été altérées."
 }

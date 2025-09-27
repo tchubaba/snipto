@@ -71,5 +71,7 @@
     "Oops! That’s not a valid snipto!": "Opa! Isso não é um snipto válido!",
     "Snipto URLs can only contain": "As URLs do snipto podem conter somente",
     "letters and numbers (A–Z, 0–9)": "letras e números (A-Z, 0-9)",
-    "Back to Home": "Voltar à home page"
+    "Back to Home": "Voltar à home page",
+    "Your Snipto will be available for retrieval for the next hour. After that, it will be deleted automatically.": "Seu Snipto vai ficar disponível para acesso pela próxima hora. Depois disso, ele será apagado automaticamente.",
+    "Could not decrypt the Snipto. Decryption failed or data tampered.": "Não conseguimos abrir este Snipto — a descriptografia falhou ou os dados podem ter sido alterados."
 }

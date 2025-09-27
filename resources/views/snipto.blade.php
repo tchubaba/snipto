@@ -16,7 +16,8 @@
                 'ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.' => __('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.'),
                 'An error occurred. Please try again.' => __('An error occurred. Please try again.'),
                 'Failed to render snipto content. Please copy it manually.' => __('Failed to render snipto content. Please copy it manually.'),
-                'Failed to find display element.' => __('Failed to find display element.')
+                'Failed to find display element.' => __('Failed to find display element.'),
+                'Could not decrypt the Snipto. Decryption failed or data tampered.' => __('Could not decrypt the Snipto. Decryption failed or data tampered.')
             ]);
         @endphp
     </script>
@@ -109,6 +110,9 @@
                     {!! __('Copy') !!}
                 </button>
             </div>
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center">
+                {!! __('Your Snipto will be available for retrieval for the next hour. After that, it will be deleted automatically.') !!}
+            </p>
             <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>
         </div>
 
