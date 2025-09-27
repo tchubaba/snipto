@@ -3,4 +3,5 @@ Allow: /$
 Allow: /faq$
 Allow: /terms$
 Allow: /contact$
+Allow: /safety$
 Disallow: /
