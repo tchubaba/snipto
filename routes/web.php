@@ -13,6 +13,7 @@ Route::get('/', function () {
 Route::view('/faq', 'faq');
 Route::view('/contact', 'contact');
 Route::view('/terms', 'terms');
+Route::view('/safety', 'safety');
 
 // ---------------------------
 // Snipto API routes

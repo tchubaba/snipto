@@ -5,7 +5,7 @@ export function sniptoComponent() {
         hmacKey: null,
         plaintextHmacKey: null,
         nonce: null,
-        payload: '',
+        payload: null, // Uint8Array for base64 bytes
         expires_at: '',
         views_remaining: 0,
         loading: true,
@@ -51,9 +51,13 @@ export function sniptoComponent() {
                 this.footerColorClass = this.$refs.sniptoDisplayFooterRef.className;
             }
 
-            const shortSecret = new URLSearchParams(window.location.hash.substring(1)).get('k');
+            const shortSecretStr = new URLSearchParams(window.location.hash.substring(1)).get('k');
+            let shortSecretBytes = null;
+            if (shortSecretStr) {
+                shortSecretBytes = new TextEncoder().encode(shortSecretStr);
+            }
 
-            if (!shortSecret) {
+            if (!shortSecretBytes) {
                 try {
                     const res = await fetch(`/api/snipto/${this.slug}`, {
                         method: 'GET',
@@ -85,7 +89,7 @@ export function sniptoComponent() {
             }
 
             try {
-                const secretHash = await this.sha256Hex(new TextEncoder().encode(shortSecret));
+                const secretHash = await this.sha256Hex(shortSecretBytes);
                 const res = await fetch(`/api/snipto/${this.slug}?key_hash=${secretHash}`, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
@@ -107,33 +111,35 @@ export function sniptoComponent() {
 
                 const data = await res.json();
 
-                this.nonce = data.nonce;
-                const { encKey, hmacKey, plaintextHmacKey } = await this.deriveKeys(shortSecret, this.nonce);
+                this.nonce = this.hexToBytes(data.nonce); // Uint8Array
+                const nonceHex = data.nonce; // Keep hex for HMAC
+                const { encKey, hmacKey, plaintextHmacKey } = await this.deriveKeys(shortSecretBytes, nonceHex);
                 this.key = encKey;
                 this.hmacKey = hmacKey;
                 this.plaintextHmacKey = plaintextHmacKey;
 
-                let decrypted;
+                let decryptedBuffer;
                 try {
-                    decrypted = await this.decryptPayload(data.payload, this.key, this.nonce, this.hmacKey);
+                    this.payload = this.base64ToBytes(data.payload); // Uint8Array
+                    decryptedBuffer = await this.decryptPayload(this.payload, this.key, this.nonce, this.hmacKey, nonceHex);
                 } catch {
                     this.errorMessage = this.t('Could not decrypt the Snipto. Decryption failed or data tampered.');
                     return;
                 }
 
+                const decryptedBytes = new Uint8Array(decryptedBuffer);
+
                 const plaintextHmac = await crypto.subtle.sign(
                     { name: 'HMAC' },
                     this.plaintextHmacKey,
-                    new TextEncoder().encode(decrypted)
+                    decryptedBytes
                 );
                 const plaintextHmacHex = Array.from(new Uint8Array(plaintextHmac))
                     .map(b => b.toString(16).padStart(2, '0'))
                     .join('');
 
-                const decryptedText = decrypted.trim();
-
                 // Render payload
-                this.renderPayload(decryptedText);
+                this.renderPayload(decryptedBytes);
 
                 this.expires_at = data.expires_at;
                 this.views_remaining = data.views_remaining - 1;
@@ -161,22 +167,27 @@ export function sniptoComponent() {
                 }
 
                 this.clearSensitiveRetrieval();
+                decryptedBytes.fill(0);
             } catch (err) {
                 this.errorMessage = err.message;
             } finally {
+                if (shortSecretBytes) shortSecretBytes.fill(0);
                 this.loading = false;
             }
         },
 
-        renderPayload(decrypted) {
+        renderPayload(decryptedBytes) {
             const tryRender = () => {
                 const container = document.querySelector('#snipto-payload-container');
                 if (container) {
                     // Clear any existing content using replaceChildren
                     container.replaceChildren();
 
+                    // Decode for rendering
+                    const decryptedText = new TextDecoder().decode(decryptedBytes).trim();
+
                     // Escape the text to prevent HTML interpretation
-                    const escapedText = this.escapeHtml(decrypted);
+                    const escapedText = this.escapeHtml(decryptedText);
 
                     // Get nonce from meta tag
                     const nonce = document.querySelector('meta[name="csp-nonce"]')?.content ||
@@ -198,7 +209,7 @@ export function sniptoComponent() {
                     tempPre.style.overflowWrap = 'anywhere';
                     tempPre.style.wordBreak = 'break-word';
                     tempPre.style.color = textColor; // Match iframe text color
-                    tempPre.textContent = decrypted;
+                    tempPre.textContent = decryptedText;
                     document.body.appendChild(tempPre);
                     const height = tempPre.offsetHeight;
                     document.body.removeChild(tempPre);
@@ -274,41 +285,45 @@ export function sniptoComponent() {
             }
         },
 
-        escapeHtml(text) {
-            return text
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        },
-
         clearSensitiveRetrieval() {
             this.key = null;
             this.hmacKey = null;
             this.plaintextHmacKey = null;
-            this.nonce = null;
-            this.payload = null;
+            if (this.nonce) {
+                this.nonce.fill(0);
+                this.nonce = null;
+            }
+            if (this.payload) {
+                this.payload.fill(0);
+                this.payload = null;
+            }
         },
 
         async submitSnipto() {
             if (!this.userInput.trim()) return;
             this.loading = true;
 
-            const shortSecret = this.generateShortSecret(16);
-            this.nonce = await this.generateRandomBytes(12);
-            const { encKey, hmacKey, plaintextHmacKey } = await this.deriveKeys(shortSecret, this.nonce);
+            const shortSecretStr = this.generateShortSecret(16);
+            const shortSecretBytes = new TextEncoder().encode(shortSecretStr);
+
+            const nonceHex = await this.generateRandomBytes(12);
+            this.nonce = this.hexToBytes(nonceHex);
+
+            const { encKey, hmacKey, plaintextHmacKey } = await this.deriveKeys(shortSecretBytes, nonceHex);
             this.key = encKey;
             this.hmacKey = hmacKey;
             this.plaintextHmacKey = plaintextHmacKey;
 
-            const encrypted = await this.encryptPayload(this.userInput, this.key, this.nonce, this.hmacKey);
+            const userInputBytes = new TextEncoder().encode(this.userInput);
+            this.userInput = ''; // Clear string early
 
-            const secretHash = await this.sha256Hex(new TextEncoder().encode(shortSecret));
+            const encryptedBase64 = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
+
+            const secretHash = await this.sha256Hex(shortSecretBytes);
             const plaintextHmac = await crypto.subtle.sign(
                 { name: 'HMAC' },
                 this.plaintextHmacKey,
-                new TextEncoder().encode(this.userInput)
+                userInputBytes
             );
             const plaintextHmacHex = Array.from(new Uint8Array(plaintextHmac))
                 .map(b => b.toString(16).padStart(2, '0'))
@@ -324,8 +339,8 @@ export function sniptoComponent() {
                     },
                     body: JSON.stringify({
                         slug: this.slug,
-                        payload: encrypted,
-                        nonce: this.nonce,
+                        payload: encryptedBase64,
+                        nonce: nonceHex,
                         key_hash: secretHash,
                         plaintext_hmac: plaintextHmacHex
                     }),
@@ -346,11 +361,13 @@ export function sniptoComponent() {
                 this.slug = body.slug;
                 this.showForm = false;
                 this.showSuccess = true;
-                this.fullUrl = `${window.location.origin}/${this.slug}#k=${shortSecret}`;
+                this.fullUrl = `${window.location.origin}/${this.slug}#k=${shortSecretStr}`;
                 QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
                 this.$refs.fullUrlInput.select();
 
                 this.clearSensitiveCreation();
+                userInputBytes.fill(0);
+                shortSecretBytes.fill(0);
             } catch {
                 this.errorMessage = this.t('An error occurred. Please try again.');
             } finally {
@@ -359,11 +376,13 @@ export function sniptoComponent() {
         },
 
         clearSensitiveCreation() {
-            this.userInput = null;
             this.key = null;
             this.hmacKey = null;
             this.plaintextHmacKey = null;
-            this.nonce = null;
+            if (this.nonce) {
+                this.nonce.fill(0);
+                this.nonce = null;
+            }
         },
 
         generateShortSecret(length) {
@@ -374,14 +393,14 @@ export function sniptoComponent() {
             for (let i = 0; i < length; i++) {
                 result += chars[array[i] % chars.length];
             }
+            array.fill(0); // Clear random bytes
             return result;
         },
 
-        async deriveKeys(secret, nonceHex) {
-            const enc = new TextEncoder();
+        async deriveKeys(secretBytes, nonceHex) {
             const keyMaterial = await crypto.subtle.importKey(
                 'raw',
-                enc.encode(secret),
+                secretBytes,
                 { name: 'PBKDF2' },
                 false,
                 ['deriveKey']
@@ -389,7 +408,7 @@ export function sniptoComponent() {
 
             const baseParams = {
                 name: 'PBKDF2',
-                salt: enc.encode(nonceHex),
+                salt: new TextEncoder().encode(nonceHex),
                 iterations: 100000,
                 hash: 'SHA-256'
             };
@@ -411,7 +430,7 @@ export function sniptoComponent() {
             );
 
             const plaintextHmacKey = await crypto.subtle.deriveKey(
-                { ...baseParams, salt: enc.encode(nonceHex + 'plaintext') },
+                { ...baseParams, salt: new TextEncoder().encode(nonceHex + 'plaintext') },
                 keyMaterial,
                 { name: 'HMAC', hash: 'SHA-256', length: 256 },
                 false,
@@ -421,13 +440,11 @@ export function sniptoComponent() {
             return { encKey, hmacKey, plaintextHmacKey };
         },
 
-        async encryptPayload(plainText, encKey, nonceHex, hmacKey) {
-            const enc = new TextEncoder();
-            const nonce = this.hexToBytes(nonceHex);
+        async encryptPayload(plainBytes, encKey, nonce, hmacKey, nonceHex) {
             const encrypted = await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv: nonce, tagLength: 128 },
                 encKey,
-                enc.encode(plainText)
+                plainBytes
             );
 
             const encryptedBytes = new Uint8Array(encrypted);
@@ -439,7 +456,11 @@ export function sniptoComponent() {
             payload.set(authTag, ciphertext.length);
 
             if (hmacKey) {
-                const hmacData = new Uint8Array([...ciphertext, ...authTag, ...enc.encode(nonceHex)]);
+                const enc = new TextEncoder();
+                const hmacData = new Uint8Array(ciphertext.length + authTag.length + nonceHex.length);
+                hmacData.set(ciphertext, 0);
+                hmacData.set(authTag, ciphertext.length);
+                hmacData.set(enc.encode(nonceHex), ciphertext.length + authTag.length);
                 const hmac = await crypto.subtle.sign({ name: 'HMAC' }, hmacKey, hmacData);
                 const hmacBytes = new Uint8Array(hmac);
                 const fullPayload = new Uint8Array(payload.length + hmacBytes.length);
@@ -451,9 +472,7 @@ export function sniptoComponent() {
             return this.bytesToBase64(payload);
         },
 
-        async decryptPayload(base64Payload, encKey, nonceHex, hmacKey) {
-            const payloadBytes = this.base64ToBytes(base64Payload);
-            const nonce = this.hexToBytes(nonceHex);
+        async decryptPayload(payloadBytes, encKey, nonce, hmacKey, nonceHex) {
             const hmacLength = hmacKey ? 32 : 0;
             const authTagLength = 16;
 
@@ -463,7 +482,11 @@ export function sniptoComponent() {
 
             if (hmacKey) {
                 const hmacReceived = payloadBytes.slice(-hmacLength);
-                const hmacData = new Uint8Array([...ciphertext, ...authTag, ...new TextEncoder().encode(nonceHex)]);
+                const enc = new TextEncoder();
+                const hmacData = new Uint8Array(ciphertext.length + authTag.length + nonceHex.length);
+                hmacData.set(ciphertext, 0);
+                hmacData.set(authTag, ciphertext.length);
+                hmacData.set(enc.encode(nonceHex), ciphertext.length + authTag.length);
                 const hmacComputed = await crypto.subtle.sign({ name: 'HMAC' }, hmacKey, hmacData);
                 if (!this.timingSafeEqual(new Uint8Array(hmacComputed), hmacReceived)) {
                     throw new Error('HMAC verification failed');
@@ -474,12 +497,11 @@ export function sniptoComponent() {
             encrypted.set(ciphertext);
             encrypted.set(authTag, ciphertext.length);
 
-            const plainBuffer = await crypto.subtle.decrypt(
+            return await crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv: nonce, tagLength: 128 },
                 encKey,
                 encrypted
-            );
-            return new TextDecoder().decode(plainBuffer);
+            ); // Return ArrayBuffer
         },
 
         async sha256Hex(bytes) {
@@ -548,6 +570,15 @@ export function sniptoComponent() {
                 str = str.replace(new RegExp(key, 'g'), value);
             }
             return str;
+        },
+
+        escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
     };
 }

@@ -71,6 +71,9 @@
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
                 {{ __('By using Snipto, you agree with the') }} <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Terms of Service') }}</a>.
             </p>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+                {{ __('To get the most out of Snipto and keep your data safe, see our') }} <a href="/safety" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('safety tips') }}</a>.
+            </p>
         </div>
 
         <!-- Quick Pitch -->

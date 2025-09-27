@@ -93,6 +93,7 @@
 <footer class="fixed bottom-0 left-0 w-full border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
     <div class="max-w-6xl mx-auto px-4 py-4 flex justify-center space-x-6 text-sm text-gray-600 dark:text-gray-400">
         <a href="/faq" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('FAQ') }}</a>
+        <a href="/safety" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Safety') }}</a>
         <a href="/terms" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Terms') }}</a>
         <a href="/contact" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Contact') }}</a>
     </div>
