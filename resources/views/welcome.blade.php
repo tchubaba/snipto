@@ -3,8 +3,10 @@
 @section('title', 'Snipto - Share your snippets. End-to-end encrypted.')
 
 @section('footer-js')
-    <script>
-        function goToSnipto(e) {
+    <script @cspNonce>
+        const form = document.getElementById('sniptoForm');
+
+        form.addEventListener('submit', function(e) {
             e.preventDefault();
             const slugInput = document.getElementById('slugInput');
             const slug = slugInput.value.trim();
@@ -14,19 +16,16 @@
             if (slug && alphanumericRegex.test(slug)) {
                 window.location.href = '/' + slug;
             } else {
-                // Show toast notification
                 toast.classList.remove('hidden', 'opacity-0');
                 toast.classList.add('opacity-100');
 
-                // Auto-hide toast after 3 seconds
                 setTimeout(() => {
                     toast.classList.remove('opacity-100');
                     toast.classList.add('opacity-0');
                     setTimeout(() => toast.classList.add('hidden'), 300);
                 }, 3000);
             }
-            return false;
-        }
+        });
     </script>
 @endsection
 
@@ -51,7 +50,7 @@
 
         <!-- Jump to Snipto Form -->
         <div class="w-full max-w-md mx-auto relative">
-            <form action="/" method="GET" onsubmit="return goToSnipto(event)">
+            <form id="sniptoForm" action="/" method="GET">
                 <div class="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden border border-gray-200 dark:border-gray-700">
                     <span class="px-3 text-gray-500 dark:text-gray-400 select-none">https://snipto.net/</span>
                     <input id="slugInput" type="text" name="slug" placeholder="{{ __('your-snipto') }}"

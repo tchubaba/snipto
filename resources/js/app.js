@@ -1,5 +1,5 @@
 import './bootstrap';
-import Alpine from 'alpinejs';
+import Alpine from '@alpinejs/csp';
 import QRCode from 'qrcode';
 
 window.Alpine = Alpine;

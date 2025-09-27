@@ -5,7 +5,7 @@
 @endsection
 
 @section('alpine-translations')
-    <script>
+    <script @cspNonce>
         window.i18n =
         @php
             echo json_encode([

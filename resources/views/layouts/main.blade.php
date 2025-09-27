@@ -13,7 +13,7 @@
     <meta name="apple-mobile-web-app-title" content="Snipto" />
     <link rel="manifest" href="/site.webmanifest" />
 
-    <script>
+    <script @cspNonce>
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.classList.add('dark');
         }
@@ -69,7 +69,7 @@
     </div>
 
     <!-- Alpine script for dropdown -->
-    <script>
+    <script @cspNonce>
         function localeDropdown() {
             return {
                 open: false,
