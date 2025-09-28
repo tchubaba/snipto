@@ -23,6 +23,7 @@ return [
         [Directive::DEFAULT, [Keyword::NONE]],
         [Directive::REQUIRE_TRUSTED_TYPES_FOR, [Keyword::SCRIPT]],
         [Directive::MANIFEST, [Keyword::SELF]],
+        [Directive::REPORT_TO, ['csp-endpoint']], // Define reporting group
     ],
 
     /*
@@ -44,7 +45,7 @@ return [
      * All violations against a policy will be reported to this url.
      * A great service you could use for this is https://report-uri.com/
      */
-    'report_uri' => env('CSP_REPORT_URI', ''),
+    'report_uri' => env('CSP_REPORT_URI', '/api/csp-report'),
 
     /*
      * Headers will only be added if this setting is set to true.
