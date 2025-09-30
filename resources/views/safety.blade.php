@@ -28,13 +28,6 @@
             </div>
 
             <div>
-                <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Copy Sniptos Right Away') !!}</h2>
-                <p>
-                    {!! __('Once you view a snippet and decide you want to keep it, copy it immediately. Sniptos are deleted from the server after viewing, so you won’t be able to see them again.') !!}
-                </p>
-            </div>
-
-            <div>
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Share Sniptos Carefully') !!}</h2>
                 <p class="mt-2">
                     {!! __('Always send the snippet URL (including the secret key, the #k= part) through secure channels like Signal or encrypted messaging.') !!}
@@ -51,6 +44,13 @@
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Be Extra Careful With Very Sensitive Info') !!}</h2>
                 <p>
                     {!! __('If your snippet contains highly confidential information, consider using offline encrypted files instead of sharing through a website. Browsers can sometimes be exposed to extensions or other risks.') !!}
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Copy Sniptos Right Away') !!}</h2>
+                <p>
+                    {!! __('Once you view a snippet and decide you want to keep it, copy it immediately. Sniptos are deleted from the server after viewing, so you won’t be able to see them again.') !!}
                 </p>
             </div>
 
