@@ -226,37 +226,47 @@ export function sniptoComponent() {
             </html>
         `;
 
-                // Create sandboxed iframe
+                // Calculate height using temporary hidden pre element
+                const containerStyles = getComputedStyle(container);
+                const paddingLeft = parseFloat(containerStyles.paddingLeft);
+                const paddingRight = parseFloat(containerStyles.paddingRight);
+                const contentWidth = container.clientWidth - paddingLeft - paddingRight;
+
+                const tempPre = document.createElement('pre');
+                tempPre.style.position = 'absolute';
+                tempPre.style.visibility = 'hidden';
+                tempPre.style.width = `${contentWidth}px`;
+                tempPre.style.fontSize = '16px';
+                tempPre.style.whiteSpace = 'pre-wrap';
+                tempPre.style.overflowWrap = 'anywhere';
+                tempPre.style.wordBreak = 'break-word';
+                tempPre.style.margin = '0';
+                tempPre.style.padding = '0';
+                tempPre.style.fontFamily = 'monospace'; // Matches default <pre> font
+                tempPre.style.lineHeight = 'normal';   // Matches default
+                tempPre.innerHTML = this.trustedTypesPolicy
+                    ? this.trustedTypesPolicy.createHTML(escapedText)
+                    : escapedText;
+
+                document.body.appendChild(tempPre);
+                const height = tempPre.getBoundingClientRect().height;
+                tempPre.remove();
+
+                // Create sandboxed iframe with no permissions
                 const iframe = document.createElement('iframe');
-                iframe.sandbox = 'allow-same-origin';
+                iframe.sandbox = '';
                 iframe.srcdoc = this.trustedTypesPolicy
                     ? this.trustedTypesPolicy.createHTML(srcdoc)
                     : srcdoc;
                 iframe.style.width = '100%';               // full width of container
-                iframe.style.height = 'auto';              // allow growth to fit content
-                iframe.style.minHeight = '100%';           // at least the container height
+                iframe.style.height = `${height}px`;       // set calculated height
                 iframe.style.border = 'none';              // no border
                 iframe.style.backgroundColor = 'transparent';
                 iframe.style.overflow = 'hidden';          // prevent internal scrollbars
                 iframe.style.display = 'block';            // avoid inline spacing issues
 
-                // Append iframe first
+                // Append iframe
                 container.appendChild(iframe);
-
-                // Adjust height after iframe loads
-                iframe.onload = () => {
-                    try {
-                        const doc = iframe.contentDocument;
-                        if (!doc) return;
-                        const pre = doc.querySelector('pre');
-                        if (!pre) return;
-
-                        const height = pre.getBoundingClientRect().height;
-                        iframe.style.height = height + 'px';
-                    } catch (e) {
-                        console.error('Failed to resize iframe', e);
-                    }
-                };
 
                 this.clearSensitiveRetrieval();
             };
