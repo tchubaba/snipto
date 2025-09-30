@@ -179,102 +179,86 @@ export function sniptoComponent() {
         renderPayload(decryptedBytes) {
             const tryRender = () => {
                 const container = document.querySelector('#snipto-payload-container');
-                if (container) {
-                    // Clear any existing content using replaceChildren
-                    container.replaceChildren();
+                if (!container) return;
 
-                    // Decode for rendering
-                    const decryptedText = new TextDecoder().decode(decryptedBytes).trim();
+                // Clear existing content
+                container.replaceChildren();
 
-                    // Escape the text to prevent HTML interpretation
-                    const escapedText = this.escapeHtml(decryptedText);
+                const decryptedText = new TextDecoder().decode(decryptedBytes).trim();
+                const escapedText = this.escapeHtml(decryptedText);
 
-                    // Get nonce from meta tag
-                    const nonce = document.querySelector('meta[name="csp-nonce"]')?.content ||
-                        document.querySelector('meta[name="csrf-token"]')?.getAttribute('nonce') ||
-                        '';
+                const nonce = document.querySelector('meta[name="csp-nonce"]')?.content ||
+                    document.querySelector('meta[name="csrf-token"]')?.getAttribute('nonce') ||
+                    '';
 
-                    // Detect theme for text color
-                    const isDark = document.documentElement.classList.contains('dark');
-                    const textColor = isDark ? '#f3f4f6' : '#111827'; // text-gray-100 or text-gray-900
+                const isDark = document.documentElement.classList.contains('dark');
+                const textColor = isDark ? '#f3f4f6' : '#111827';
 
-                    // Create temp element to measure height (minimal styles)
-                    const tempPre = document.createElement('pre');
-                    tempPre.style.position = 'absolute';
-                    tempPre.style.visibility = 'hidden';
-                    tempPre.style.padding = '0';
-                    tempPre.style.margin = '0';
-                    tempPre.style.fontSize = '16px'; // text-base
-                    tempPre.style.whiteSpace = 'pre-wrap';
-                    tempPre.style.overflowWrap = 'anywhere';
-                    tempPre.style.wordBreak = 'break-word';
-                    tempPre.style.color = textColor; // Match iframe text color
-                    tempPre.textContent = decryptedText;
-                    document.body.appendChild(tempPre);
-                    const height = tempPre.offsetHeight;
-                    document.body.removeChild(tempPre);
+                // Build srcdoc
+                const srcdoc = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style nonce="${nonce}">
+                    html, body {
+                        margin: 0;
+                        padding: 0;
+                        overflow: hidden;
+                        display: block;
+                        width: 100%;
+                        color: ${textColor};
+                    }
 
-                    // Build srcdoc with minimal styles
-                    const srcdoc = `
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <style nonce="${nonce}">
-                                body {
-                                    margin: 0;
-                                    padding: 0;
-                                    font-family: inherit;
-                                    color: ${textColor}; /* Explicitly set for theme */
-                                    background-color: transparent;
-                                }
-                                pre {
-                                    margin: 0;
-                                    padding: 0;
-                                    font-size: 16px; /* text-base */
-                                    white-space: pre-wrap;
-                                    overflow-wrap: anywhere;
-                                    word-break: break-word;
-                                }
-                            </style>
-                        </head>
-                        <body>
-                            <pre>${escapedText}</pre>
-                        </body>
-                        </html>
-                    `;
+                    pre {
+                        display: block;
+                        margin: 0;
+                        padding: 0;
+                        font-size: 16px;
+                        white-space: pre-wrap;
+                        overflow-wrap: anywhere;
+                        word-break: break-word;
+                    }
+                </style>
+            </head>
+            <body>
+                <pre>${escapedText}</pre>
+            </body>
+            </html>
+        `;
 
-                    // Create sandboxed iframe
-                    const iframe = document.createElement('iframe');
-                    iframe.sandbox = ''; // Strict sandbox
-                    // Use Trusted Types for srcdoc if available
-                    iframe.srcdoc = this.trustedTypesPolicy
-                        ? this.trustedTypesPolicy.createHTML(srcdoc)
-                        : srcdoc;
-                    iframe.style.width = '100%';
-                    iframe.style.height = `${height}px`; // Auto-fit
-                    iframe.style.border = 'none';
-                    iframe.style.backgroundColor = 'transparent';
+                // Create sandboxed iframe
+                const iframe = document.createElement('iframe');
+                iframe.sandbox = 'allow-same-origin';
+                iframe.srcdoc = this.trustedTypesPolicy
+                    ? this.trustedTypesPolicy.createHTML(srcdoc)
+                    : srcdoc;
+                iframe.style.width = '100%';               // full width of container
+                iframe.style.height = 'auto';              // allow growth to fit content
+                iframe.style.minHeight = '100%';           // at least the container height
+                iframe.style.border = 'none';              // no border
+                iframe.style.backgroundColor = 'transparent';
+                iframe.style.overflow = 'hidden';          // prevent internal scrollbars
+                iframe.style.display = 'block';            // avoid inline spacing issues
 
-                    // Append to container
-                    container.appendChild(iframe);
+                // Append iframe first
+                container.appendChild(iframe);
 
-                    this.clearSensitiveRetrieval();
-                } else {
-                    let attempts = 0;
-                    const maxAttempts = 10;
-                    const pollInterval = setInterval(() => {
-                        const element = document.querySelector('#snipto-payload-container');
-                        if (element) {
-                            tryRender();
-                            clearInterval(pollInterval);
-                        } else if (attempts >= maxAttempts) {
-                            this.errorMessage = this.t('Failed to find display element.');
-                            console.error('Failed to find #snipto-payload-container after retries');
-                            clearInterval(pollInterval);
-                        }
-                        attempts++;
-                    }, 100);
-                }
+                // Adjust height after iframe loads
+                iframe.onload = () => {
+                    try {
+                        const doc = iframe.contentDocument;
+                        if (!doc) return;
+                        const pre = doc.querySelector('pre');
+                        if (!pre) return;
+
+                        const height = pre.getBoundingClientRect().height;
+                        iframe.style.height = height + 'px';
+                    } catch (e) {
+                        console.error('Failed to resize iframe', e);
+                    }
+                };
+
+                this.clearSensitiveRetrieval();
             };
 
             // Wait for DOM to be ready

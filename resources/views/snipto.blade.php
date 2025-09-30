@@ -55,7 +55,7 @@
                 {!! __('Here’s your snipto:') !!}
             </p>
             <div id="snipto-payload-container"
-                 class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap">
+                 class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap h-auto min-h-[50px] max-h-[calc(100vh-20rem)] overflow-auto">
             </div>
             <p x-ref="sniptoDisplayFooterRef"
                x-text="sniptoDisplayFooter"
