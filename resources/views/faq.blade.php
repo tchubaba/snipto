@@ -118,7 +118,7 @@
         </div>
 
         <!-- Smooth scrolling -->
-        <script>
+        <script @cspNonce>
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
                     e.preventDefault();
