@@ -19,6 +19,7 @@ export function sniptoComponent() {
         calledInit: false,
         sniptoDisplayFooter: null,
         footerColorClass: '',
+        lineWidths: null, // To store line widths for resize without sensitive data
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
@@ -138,12 +139,13 @@ export function sniptoComponent() {
                     .map(b => b.toString(16).padStart(2, '0'))
                     .join('');
 
-                // Render payload
-                this.renderPayload(decryptedBytes);
-
                 this.expires_at = data.expires_at;
                 this.views_remaining = data.views_remaining - 1;
                 this.showPayload = true;
+
+                this.$nextTick(() => {
+                    this.renderPayload(decryptedBytes);
+                });
 
                 // Notify server of view
                 const viewed = await fetch(`/api/snipto/${this.slug}/viewed`, {
@@ -179,7 +181,10 @@ export function sniptoComponent() {
         renderPayload(decryptedBytes) {
             const tryRender = () => {
                 const container = document.querySelector('#snipto-payload-container');
-                if (!container) return;
+                if (!container) {
+                    console.error('Container #snipto-payload-container not found');
+                    return;
+                }
 
                 // Clear existing content
                 container.replaceChildren();
@@ -203,20 +208,22 @@ export function sniptoComponent() {
                     html, body {
                         margin: 0;
                         padding: 0;
-                        overflow: hidden;
                         display: block;
                         width: 100%;
                         color: ${textColor};
+                        overflow: hidden;
                     }
 
                     pre {
                         display: block;
                         margin: 0;
                         padding: 0;
+                        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
                         font-size: 16px;
                         white-space: pre-wrap;
                         overflow-wrap: anywhere;
                         word-break: break-word;
+                        line-height: 1.5;
                     }
                 </style>
             </head>
@@ -226,31 +233,40 @@ export function sniptoComponent() {
             </html>
         `;
 
-                // Calculate height using temporary hidden pre element
+                // Calculate height using canvas
                 const containerStyles = getComputedStyle(container);
-                const paddingLeft = parseFloat(containerStyles.paddingLeft);
-                const paddingRight = parseFloat(containerStyles.paddingRight);
-                const contentWidth = container.clientWidth - paddingLeft - paddingRight;
+                const paddingLeft = parseFloat(containerStyles.paddingLeft) || 0;
+                const paddingRight = parseFloat(containerStyles.paddingRight) || 0;
+                let contentWidth = container.clientWidth - paddingLeft - paddingRight;
 
-                const tempPre = document.createElement('pre');
-                tempPre.style.position = 'absolute';
-                tempPre.style.visibility = 'hidden';
-                tempPre.style.width = `${contentWidth}px`;
-                tempPre.style.fontSize = '16px';
-                tempPre.style.whiteSpace = 'pre-wrap';
-                tempPre.style.overflowWrap = 'anywhere';
-                tempPre.style.wordBreak = 'break-word';
-                tempPre.style.margin = '0';
-                tempPre.style.padding = '0';
-                tempPre.style.fontFamily = 'monospace'; // Matches default <pre> font
-                tempPre.style.lineHeight = 'normal';   // Matches default
-                tempPre.innerHTML = this.trustedTypesPolicy
-                    ? this.trustedTypesPolicy.createHTML(escapedText)
-                    : escapedText;
+                if (contentWidth <= 0) {
+                    console.warn('Container width is zero or negative. Using fallback width.');
+                    contentWidth = window.innerWidth - 32; // Fallback to viewport width minus margins
+                }
 
-                document.body.appendChild(tempPre);
-                const height = tempPre.getBoundingClientRect().height;
-                tempPre.remove();
+                const fontSize = 16;
+                const lineHeight = fontSize * 1.5; // Fixed line-height
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`;
+                const lines = decryptedText.split('\n');
+                this.lineWidths = lines.map(line => ctx.measureText(line).width); // Store widths for resize (non-sensitive)
+                let height = 0;
+                for (const line of lines) {
+                    const metrics = ctx.measureText(line);
+                    let lineWidth = metrics.width;
+                    lineWidth *= 1.02; // Small multiplier for rendering differences
+                    const wrappedLines = Math.ceil(lineWidth / contentWidth) || 1;
+                    height += wrappedLines * lineHeight;
+                }
+                canvas.remove();
+
+                // Add buffer for margins/padding and rendering quirks
+                height += lineHeight * 1;
+
+                // Debug logging
+                console.log('Content width:', contentWidth, 'Calculated height:', height);
 
                 // Create sandboxed iframe with no permissions
                 const iframe = document.createElement('iframe');
@@ -258,15 +274,38 @@ export function sniptoComponent() {
                 iframe.srcdoc = this.trustedTypesPolicy
                     ? this.trustedTypesPolicy.createHTML(srcdoc)
                     : srcdoc;
-                iframe.style.width = '100%';               // full width of container
-                iframe.style.height = `${height}px`;       // set calculated height
-                iframe.style.border = 'none';              // no border
+                iframe.style.width = '100%';
+                iframe.style.height = `${height}px`;
+                iframe.style.border = 'none';
                 iframe.style.backgroundColor = 'transparent';
-                iframe.style.overflow = 'hidden';          // prevent internal scrollbars
-                iframe.style.display = 'block';            // avoid inline spacing issues
+                iframe.style.overflow = 'hidden';
+                iframe.style.display = 'block';
 
                 // Append iframe
                 container.appendChild(iframe);
+
+                // Recalculate height on window resize
+                const resizeHandler = () => {
+                    let newContentWidth = container.clientWidth - paddingLeft - paddingRight;
+                    if (newContentWidth <= 0) {
+                        newContentWidth = window.innerWidth - 32;
+                    }
+                    let newHeight = 0;
+                    for (const lineWidth of this.lineWidths) {
+                        let adjustedWidth = lineWidth * 1.02;
+                        const wrappedLines = Math.ceil(adjustedWidth / newContentWidth) || 1;
+                        newHeight += wrappedLines * lineHeight;
+                    }
+                    newHeight += lineHeight * 1;
+                    console.log('Resize - New content width:', newContentWidth, 'New height:', newHeight);
+                    iframe.style.height = `${newHeight}px`;
+                };
+                window.addEventListener('resize', resizeHandler);
+
+                // Cleanup on component destruction
+                this.$watch('$destroy', () => {
+                    window.removeEventListener('resize', resizeHandler);
+                });
 
                 this.clearSensitiveRetrieval();
             };

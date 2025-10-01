@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Middleware\AddReportToHeader;
+use App\Http\Middleware\CrossOriginIsolation;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -24,7 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
             AddQueuedCookiesToResponse::class,
             StartSession::class,
         ]);
-        $middleware->append(AddCspHeaders::class);
+        $middleware->append([
+            AddCspHeaders::class,
+            CrossOriginIsolation::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
