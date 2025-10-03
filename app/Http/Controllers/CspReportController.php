@@ -56,7 +56,8 @@ class CspReportController extends Controller
 
         // Check for validation errors
         if ($validator->fails()) {
-            return response()->json(['error' => 'Invalid CSP report', 'details' => $validator->errors()], 400);
+            Log::channel('csp')->error('Invalid CSP report', $validator->errors()->all());
+            return response()->json(['error' => 'Invalid CSP report'], 400);
         }
 
         // Log valid report
