@@ -43,14 +43,14 @@ class CspReportController extends Controller
             // Nested keys
             'csp-report.blocked-uri'         => ['required', 'string'],
             'csp-report.column-number'       => ['nullable', 'integer', 'min:0'],
-            'csp-report.disposition'         => ['required', 'string', 'in:enforce,report'],
+            'csp-report.disposition'         => ['string', 'in:enforce,report'],
             'csp-report.document-uri'        => ['required', 'url', 'starts_with:' . config('app.url')],
             'csp-report.effective-directive' => ['required', 'string'],
             'csp-report.line-number'         => ['nullable', 'integer', 'min:0'],
             'csp-report.original-policy'     => ['required', 'string'],
             'csp-report.referrer'            => ['nullable', 'string'],
             'csp-report.source-file'         => ['nullable', 'string'],
-            'csp-report.status-code'         => ['required', 'integer', 'min:100', 'max:599'],
+            'csp-report.status-code'         => ['required', 'integer', 'max:599'],
             'csp-report.violated-directive'  => ['required', 'string'],
         ]);
 
