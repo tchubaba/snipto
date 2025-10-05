@@ -33,6 +33,7 @@
     <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
         <!-- Hero Section -->
         <div class="space-y-4">
+            <h1 class="sr-only">Snipto.net – Secure, Ephemeral, End-to-End Encrypted Messages</h1>
             <div class="flex justify-center">
                 <picture>
                     <!-- Dark theme image -->
@@ -78,6 +79,7 @@
 
         <!-- Quick Pitch -->
         <div class="space-y-2 text-gray-600 dark:text-gray-300">
+            <h2 class="sr-only">Why use Snipto?</h2>
             <p>🔒 {{ __('End-to-end encryption ensures only you and your recipient can read the text.') }}</p>
             <p>⏳ {{ __('Sniptos are ephemeral - they are deleted from our systems when viewed.') }}</p>
             <p>⚡ {{ __('Simple, fast, and private — no signups required.') }}</p>

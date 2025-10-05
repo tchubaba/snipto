@@ -6,6 +6,15 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="csp-nonce" content="{{ app('csp-nonce') }}">
     <title>@yield('title', 'Snipto')</title>
+    <meta name="description" content="Snipto.net allows you to share self-destructing, end-to-end encrypted messages. Messages are deleted after being read or after 1 hour.">
+    <link rel="canonical" href="https://snipto.net/">
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:title" content="Snipto.net – Secure, Ephemeral, Encrypted Messages">
+    <meta property="og:description" content="Share self-destructing, end-to-end encrypted messages. No account required.">
+    <meta property="og:url" content="https://snipto.net/">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
 
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
