@@ -1,0 +1,36 @@
+{
+  "node_modules/flag-icons/flags/4x3/br.svg": {
+    "file": "assets/br-Cu5YU29T.svg",
+    "src": "node_modules/flag-icons/flags/4x3/br.svg"
+  },
+  "node_modules/flag-icons/flags/4x3/de.svg": {
+    "file": "assets/de-B-2o-4Z9.svg",
+    "src": "node_modules/flag-icons/flags/4x3/de.svg"
+  },
+  "node_modules/flag-icons/flags/4x3/es.svg": {
+    "file": "assets/es-d5m8M5h8.svg",
+    "src": "node_modules/flag-icons/flags/4x3/es.svg"
+  },
+  "node_modules/flag-icons/flags/4x3/fr.svg": {
+    "file": "assets/fr-DVvUyOqI.svg",
+    "src": "node_modules/flag-icons/flags/4x3/fr.svg"
+  },
+  "node_modules/flag-icons/flags/4x3/us.svg": {
+    "file": "assets/us-C73uVeEr.svg",
+    "src": "node_modules/flag-icons/flags/4x3/us.svg"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-W9xiVgC2.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "js/app-CLFDbUBK.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  }
+}
