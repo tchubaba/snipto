@@ -33,7 +33,7 @@
     <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
         <!-- Hero Section -->
         <div class="space-y-4">
-            <h1 class="sr-only">Snipto.net – Secure, Ephemeral, End-to-End Encrypted Messages</h1>
+            <h1 class="sr-only">End-to-end encrypted pastebin for ephemeral text</h1>
             <div class="flex justify-center">
                 <picture>
                     <!-- Dark theme image -->
@@ -44,8 +44,8 @@
                 </picture>
             </div>
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
-                {{ __('An end-to-end encrypted paste service.') }}<br>
-                {{ __('Share text securely. No accounts, no hassle.') }}
+                {{ __('An end-to-end encrypted pastebin service.') }}<br>
+                {{ __('Share text privately. No accounts, no hassle.') }}
             </p>
         </div>
 
