@@ -22,6 +22,9 @@ class CrossOriginIsolation
         $response->headers->set('Cross-Origin-Embedder-Policy', 'require-corp');
         $response->headers->set('Cross-Origin-Resource-Policy', 'same-origin');
 
+        // Referrer Policy
+        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
         return $response;
     }
 }
