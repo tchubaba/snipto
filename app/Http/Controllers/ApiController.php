@@ -61,16 +61,18 @@ class ApiController extends Controller
             ], 403);
         }
 
+        // The base response for when a snipto is found.
         $response = [
-            'success'         => true,
-            'exists'          => true,
-            'views_remaining' => $snipto->views_remaining,
-            'expires_at'      => $snipto->expires_at,
+            'success' => true,
+            'exists'  => true,
+//            'expires_at' => $snipto->expires_at,
         ];
 
+        // If the key hash is present and valid, add the payload, decrement views and include view_remaining.
         if ( ! empty($keyHash)) {
-            $response['payload'] = $snipto->payload;
-            $response['nonce']   = $snipto->nonce;
+            $response['payload']         = $snipto->payload;
+            $response['nonce']           = $snipto->nonce;
+            $response['views_remaining'] = $snipto->decrementViews();
         }
 
         return response()->json($response);
@@ -101,7 +103,6 @@ class ApiController extends Controller
             'slug'            => 'required|string|max:100|unique:sniptos,slug',
             'payload'         => 'required|string|min:1',
             'key_hash'        => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
-            'plaintext_hmac'  => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
             'nonce'           => 'required|string|size:24|regex:/^[0-9a-fA-F]+$/',
             'views_remaining' => 'nullable|integer|min:1|max:200',
             'expires_at'      => 'nullable|date|after:now', // TODO: perhaps use pre-defined values like 1 day, 1 week, etc
@@ -114,7 +115,7 @@ class ApiController extends Controller
             ], 422);
         }
 
-        // Forcing expiration date to always be 1 week from now.
+        // Forcing expiration date to always be 1 hour from now.
         $validated = $validator->validated();
         //        if (empty($validated['expires_at'])) {
         $validated['expires_at'] = Carbon::now()->addHour();
@@ -140,68 +141,6 @@ class ApiController extends Controller
         return response()->json([
             'success' => true,
             'slug'    => $snipto->slug,
-        ]);
-    }
-
-    /**
-     * Marks a Snipto resource as viewed and validates the provided payload hash.
-     *
-     * This method ensures the integrity of the request by validating the hash of the
-     * payload against the stored Snipto payload hash. If the `payload_hash` matches and
-     * the Snipto exists, the view count is decremented. Returns appropriate JSON
-     * responses for success or failure scenarios.
-     *
-     * Validation rules:
-     * - 'payload_hash': Required, string, exactly 64 characters, must be a valid SHA-256 hash.
-     *
-     * Workflow:
-     * - Retrieves the Snipto record by the provided `slug`.
-     * - Confirms the existence of the Snipto.
-     * - Validates the hash of the payload against the input.
-     * - Decrements the views remaining if validation is successful.
-     *
-     * @param string $slug The unique identifier of the Snipto resource.
-     * @param Request $request The incoming HTTP request containing 'payload_hash'.
-     *
-     * @return JsonResponse A JSON response indicating the success or failure of the operation.
-     */
-    public function markViewed(string $slug, Request $request): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'plaintext_hmac' => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors'  => $validator->errors(),
-            ], 422);
-        }
-
-        $snipto = Snipto::where('slug', $slug)->first();
-
-        if ( ! $snipto) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Snipto not found',
-            ], 404);
-        }
-
-        if ($snipto->plaintext_hmac
-            !== $request->input('plaintext_hmac')
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid payload hash',
-            ], 400);
-        }
-
-        $snipto->decrementViews();
-
-        return response()->json([
-            'success'         => true,
-            'message'         => 'Marked as viewed',
-            'views_remaining' => $snipto->views_remaining,
         ]);
     }
 }

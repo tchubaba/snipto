@@ -14,7 +14,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $slug
  * @property string $payload
  * @property string $key_hash
- * @property string $plaintext_hmac
  * @property string $nonce
  * @property int|null $views_remaining
  * @property Carbon $expires_at
@@ -25,7 +24,6 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder|Snipto whereSlug($value)
  * @method static Builder|Snipto wherePayload($value)
  * @method static Builder|Snipto whereKeyHash($value)
- * @method static Builder|Snipto wherePlaintextHmac($value)
  * @method static Builder|Snipto whereNonce($value)
  * @method static Builder|Snipto whereViewsRemaining($value)
  * @method static Builder|Snipto whereExpiresAt($value)
@@ -44,7 +42,6 @@ class Snipto extends Model
         'slug',
         'payload',
         'key_hash',
-        'plaintext_hmac',
         'nonce',
         'views_remaining',
         'expires_at',
@@ -54,7 +51,6 @@ class Snipto extends Model
         'slug'            => 'string',
         'payload'         => 'string',
         'key_hash'        => 'string',
-        'plaintext_hmac'  => 'string',
         'nonce'           => 'string',
         'views_remaining' => 'integer',
         'expires_at'      => 'datetime',
@@ -71,24 +67,19 @@ class Snipto extends Model
     /**
      * Decrement views remaining and delete if needed.
      */
-    public function decrementViews(): void
+    public function decrementViews(): ?int
     {
         // Unlimited views
         if ($this->views_remaining === null) {
-            return;
+            return null;
         }
 
         $this->decrement('views_remaining');
+        $viewRemaining = $this->views_remaining;
         if ($this->views_remaining < 1) {
             $this->delete();
         }
-    }
 
-    /**
-     * SHA256 hashes the payload and returns it.
-     */
-    public function getPayloadHash(): string
-    {
-        return hash('sha256', $this->payload);
+        return $viewRemaining;
     }
 }

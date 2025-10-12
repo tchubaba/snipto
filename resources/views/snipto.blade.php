@@ -24,6 +24,9 @@
 @endsection
 
 @section('content')
+    <style @cspNonce>
+        [x-cloak] { display: none !important; }
+    </style>
 
     <div class="max-w-4xl w-full rounded-xl p-6 space-y-4
             shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
@@ -31,8 +34,8 @@
          x-data="sniptoComponent()"
          x-init="init()"
          data-slug="{{ request()->path() }}"
+         x-on:before-unmount.window="destroy()"
     >
-
         <!-- Loader -->
         <div x-show="loading"
              x-transition.opacity
@@ -46,81 +49,94 @@
             </div>
         </div>
 
-        <!-- Display payload -->
-        <div x-show="showPayload"
-             x-transition.opacity.duration.500ms
-             class="space-y-4 transform transition-all duration-300 hover:scale-[1.01]">
-
-            <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
-                {!! __('Here’s your snipto:') !!}
-            </p>
-            <div id="snipto-payload-container"
-                 class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap h-auto min-h-[50px] max-h-[calc(100vh-20rem)] overflow-auto">
-            </div>
-            <p x-ref="sniptoDisplayFooterRef"
-               x-text="sniptoDisplayFooter"
-               :class="footerColorClass"
-               class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
-                {!! __('If you want to keep this Snipto, copy and paste it elsewhere. It has now been deleted from our servers and cannot be viewed again.') !!}
-            </p>
-        </div>
-
-        <!-- Create new snipto -->
-        <div x-show="showForm"
-             x-transition.opacity.duration.500ms
-             x-transition.scale.origin.top
-             class="space-y-4 transform transition-all duration-300">
-            <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
-                {!! __('Got something to share?') !!}
-            </p>
-            <textarea x-model="userInput" rows="5" placeholder="{!! __('Type or paste your text here') !!}"
-                      x-ref="textarea"
-                      class="w-full border rounded p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none
-                     dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200
-                     placeholder-gray-400 dark:placeholder-gray-500"></textarea>
-
-            <div class="flex flex-col items-center space-y-2">
-                <button @click="submitSnipto()"
-                        class="bg-indigo-500 text-white px-6 py-2 rounded shadow hover:bg-indigo-600
-                       hover:shadow-lg transition transform duration-150 active:scale-95">
-                    {!! __('Snipto it') !!}
-                </button>
-
-                <!-- Terms of Service notice -->
-                <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    {!! __('By using Snipto, you agree with the') !!} <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{!! __('Terms of Service') !!}</a>.
+        <!-- Content Wrapper: Hide until loading completes -->
+        <div x-show="!loading" x-cloak x-transition:enter="transition ease-out duration-500"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-300"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="space-y-4">
+            <!-- Display payload -->
+            <div x-show="showPayload" x-cloak
+                 x-transition.opacity.duration.500ms
+                 class="space-y-4 transform transition-all duration-300 hover:scale-[1.01]">
+                <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
+                    {!! __('Here’s your snipto:') !!}
                 </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
-                    {{ __('Keep your data safe by following our') }} <a href="/safety" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('safety tips') }}</a>.
+                <div id="snipto-payload-container"
+                     class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap h-auto min-h-[50px] max-h-[calc(100vh-20rem)] overflow-auto">
+                </div>
+                <p x-ref="sniptoDisplayFooterRef"
+                   x-text="sniptoDisplayFooter"
+                   :class="footerColorClass"
+                   class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                    {!! __('If you want to keep this Snipto, copy and paste it elsewhere. It has now been deleted from our servers and cannot be viewed again.') !!}
                 </p>
             </div>
-        </div>
 
-        <!-- Success info -->
-        <div x-show="showSuccess"
-             x-transition.opacity.duration.500ms
-             x-transition.scale.origin.top
-             class="space-y-4 transform transition-all duration-300">
-            <p class="text-green-600 dark:text-green-400 font-medium">{!! __('Here’s your Snipto:') !!}</p>
-            <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
-                <input type="text" :value="fullUrl" readonly
-                       x-ref="fullUrlInput"
-                       class="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none
-                          dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
-                <button @click="copyUrl()"
-                        class="bg-indigo-500 text-white px-3 py-1 rounded shadow hover:bg-indigo-600
-                           hover:shadow-md transition transform duration-150 active:scale-95">
-                    {!! __('Copy') !!}
-                </button>
+            <!-- Create new snipto -->
+            <div x-show="showForm" x-cloak
+                 x-transition.opacity.duration.500ms
+                 x-transition.scale.origin.top
+                 class="space-y-4 transform transition-all duration-300">
+                <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
+                    {!! __('Got something to share?') !!}
+                </p>
+                <textarea x-model="userInput" rows="5" placeholder="{!! __('Type or paste your text here') !!}"
+                          x-ref="textarea"
+                          class="w-full border rounded p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none
+                         dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200
+                         placeholder-gray-400 dark:placeholder-gray-500"></textarea>
+                <div class="flex flex-col items-center space-y-2">
+                    <button @click="submitSnipto()"
+                            class="bg-indigo-500 text-white px-6 py-2 rounded shadow hover:bg-indigo-600
+                           hover:shadow-lg transition transform duration-150 active:scale-95">
+                        {!! __('Snipto it') !!}
+                    </button>
+                    <!-- Terms of Service notice -->
+                    <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
+                        {!! __('By using Snipto, you agree with the') !!} <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{!! __('Terms of Service') !!}</a>.
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
+                        {{ __('Keep your data safe by following our') }} <a href="/safety" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('safety tips') }}</a>.
+                    </p>
+                </div>
             </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 text-center">
-                {!! __('Your Snipto will be available for retrieval for the next hour. After that, it will be deleted automatically.') !!}
-            </p>
-            <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>
+
+            <!-- Success info -->
+            <div x-show="showSuccess" x-cloak
+                 x-transition.opacity.duration.500ms
+                 x-transition.scale.origin.top
+                 class="space-y-4 transform transition-all duration-300">
+                <p class="text-green-600 dark:text-green-400 font-medium">{!! __('Here’s your Snipto:') !!}</p>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                    <input type="text" :value="fullUrl" readonly
+                           x-ref="fullUrlInput"
+                           class="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none
+                              dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">
+                    <button @click="copyUrl()"
+                            class="bg-indigo-500 text-white px-3 py-1 rounded shadow hover:bg-indigo-600
+                               hover:shadow-md transition transform duration-150 active:scale-95">
+                        {!! __('Copy') !!}
+                    </button>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 text-center">
+                    {!! __('Your Snipto will be available for retrieval for the next hour. After that, it will be deleted automatically.') !!}
+                </p>
+                <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>
+            </div>
+
+            <!-- Error -->
+            <div x-show="errorMessage" x-cloak
+                 x-transition.opacity.duration.300ms
+                 x-text="errorMessage"
+                 class="text-red-600 dark:text-red-400 mt-4 font-medium">
+            </div>
         </div>
 
         <!-- Toast notification -->
-        <div x-show="showToast"
+        <div x-show="showToast" x-cloak
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="opacity-0 translate-y-4"
              x-transition:enter-end="opacity-100 translate-y-0"
@@ -131,14 +147,5 @@
             px-4 py-2 rounded shadow-lg z-50 text-sm">
             Copied to clipboard!
         </div>
-
-        <!-- Error -->
-        <div x-show="errorMessage"
-             x-transition.opacity.duration.300ms
-             x-text="errorMessage"
-             class="text-red-600 dark:text-red-400 mt-4 font-medium">
-        </div>
-
     </div>
-
 @endsection
