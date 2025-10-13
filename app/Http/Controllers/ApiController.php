@@ -100,8 +100,14 @@ class ApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'slug'            => 'required|string|max:100|unique:sniptos,slug',
-            'payload'         => 'required|string|min:1',
+            'slug'    => 'required|string|max:100|unique:sniptos,slug',
+            'payload' => [
+                'required',
+                'string',
+                'min:4',
+                'max:10485760', // 10 MB (10 * 1024 * 1024 bytes)
+                'regex:/^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/',
+            ],
             'key_hash'        => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
             'nonce'           => 'required|string|size:24|regex:/^[0-9a-fA-F]+$/',
             'views_remaining' => 'nullable|integer|min:1|max:200',
