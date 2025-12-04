@@ -1,7 +1,7 @@
 <?php
 
- use Spatie\Csp\Directive;
- use Spatie\Csp\Keyword;
+use Spatie\Csp\Directive;
+use Spatie\Csp\Keyword;
 
 return [
 

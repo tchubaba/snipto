@@ -117,7 +117,7 @@ class ApiController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'errors'  => $validator->errors(),
+//                'errors'  => $validator->errors(), // Not an API for public consumption, so no need to include errors.
             ], 422);
         }
 
