@@ -98,5 +98,8 @@
     "If you notice a potential security issue or bug, contact the site administrators right away so it can be fixed.": "Se notar algum problema de segurança ou bug, entre em contato com os administradores do site imediatamente para que seja resolvido.",
     "Safety": "Segurança",
     "Keep your data safe by following our": "Mantenha seus dados seguros seguindo nossas",
-    "safety tips": "dicas de segurança"
+    "safety tips": "dicas de segurança",
+    "Warning: Turning off end-to-end encryption means your text will be sent in plain text and will be readable while stored on the server.": "Aviso: Desativar a criptografia de ponta a ponta significa que seu texto será enviado sem criptografia e ficará legível enquanto estiver armazenado no servidor.",
+    "Use end-to-end encryption": "Usar criptografia de ponta a ponta",
+    "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Aviso: Este texto foi compartilhado sem criptografia de ponta a ponta. Ele foi enviado e armazenado sem proteção e poderia ser lido enquanto estava no servidor."
 }

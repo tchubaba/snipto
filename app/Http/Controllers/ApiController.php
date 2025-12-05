@@ -54,6 +54,16 @@ class ApiController extends Controller
             ], 410);
         }
 
+        if ( ! $snipto->isEncrypted()) {
+            return response()->json([
+                'success'         => true,
+                'exists'          => true,
+                'is_encrypted'    => false,
+                'payload'         => $snipto->payload,
+                'views_remaining' => $snipto->decrementViews(),
+            ]);
+        }
+
         if ( ! empty($keyHash) && $snipto->key_hash !== $keyHash) {
             return response()->json([
                 'success' => false,
@@ -63,8 +73,9 @@ class ApiController extends Controller
 
         // The base response for when a snipto is found.
         $response = [
-            'success' => true,
-            'exists'  => true,
+            'success'      => true,
+            'exists'       => true,
+            'is_encrypted' => true,
 //            'expires_at' => $snipto->expires_at,
         ];
 
@@ -99,20 +110,35 @@ class ApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'slug'    => 'required|string|max:100|unique:sniptos,slug',
-            'payload' => [
+        $isEncrypted = $request->boolean('is_encrypted');
+
+        $rules = [
+            'slug'            => 'required|string|max:100|unique:sniptos,slug',
+            'is_encrypted'    => 'required|boolean',
+            'views_remaining' => 'nullable|integer|min:1|max:200',
+            'expires_at'      => 'nullable|date|after:now', // TODO: perhaps use pre-defined values like 1 day, 1 week, etc
+        ];
+
+        if ($isEncrypted) {
+            $rules['payload'] = [
                 'required',
                 'string',
                 'min:4',
                 'max:10485760', // 10 MB (10 * 1024 * 1024 bytes)
                 'regex:/^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/',
-            ],
-            'key_hash'        => 'required|string|size:64|regex:/^[0-9a-fA-F]+$/',
-            'nonce'           => 'required|string|size:24|regex:/^[0-9a-fA-F]+$/',
-            'views_remaining' => 'nullable|integer|min:1|max:200',
-            'expires_at'      => 'nullable|date|after:now', // TODO: perhaps use pre-defined values like 1 day, 1 week, etc
-        ]);
+            ];
+            $rules['key_hash'] = 'required|string|size:64|regex:/^[0-9a-fA-F]+$/';
+            $rules['nonce']    = 'required|string|size:24|regex:/^[0-9a-fA-F]+$/';
+        } else {
+            $rules['payload'] = [
+                'required',
+                'string',
+                'min:1',
+                'max:10485760', // 10 MB
+            ];
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response()->json([

@@ -98,5 +98,8 @@
     "Watch for Anything Unusual": "Atento a Cualquier Cosa Inusual",
     "Safety": "Seguridad",
     "Keep your data safe by following our": "Mantén tus datos seguros siguiendo nuestros",
-    "safety tips": "consejos de seguridad"
+    "safety tips": "consejos de seguridad",
+    "Warning: Turning off end-to-end encryption means your text will be sent in plain text and will be readable while stored on the server.": "Advertencia: Desactivar el cifrado de extremo a extremo significa que su texto se enviará sin cifrado y será legible mientras se almacene en el servidor.",
+    "Use end-to-end encryption": "Usar cifrado de extremo a extremo",
+    "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Aviso: Este texto se compartió sin cifrado de extremo a extremo. Fue enviado y almacenado sin protección y podría leerse mientras estaba en el servidor."
 }
