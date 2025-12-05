@@ -98,5 +98,8 @@
     "Watch for Anything Unusual": "Surveillez Tout Comportement Suspect",
     "Safety": "Sécurité",
     "Keep your data safe by following our": "Protégez vos données en suivant nos",
-    "safety tips": "conseils de sécurité"
+    "safety tips": "conseils de sécurité",
+    "Warning: Turning off end-to-end encryption means your text will be sent in plain text and will be readable while stored on the server.": "Avertissement : Désactiver le chiffrement de bout en bout signifie que votre texte sera envoyé sans chiffrement et restera lisible lorsqu’il sera stocké sur le serveur.",
+    "Use end-to-end encryption": "Utiliser le chiffrement de bout en bout",
+    "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Avertissement : Ce texte a été partagé sans chiffrement de bout en bout. Il a été envoyé et stocké sans protection et pouvait être lu lorsqu’il était sur le serveur."
 }

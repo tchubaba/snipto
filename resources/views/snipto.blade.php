@@ -64,6 +64,10 @@
                 <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
                     {!! __('Here’s your snipto:') !!}
                 </p>
+                <p x-show="!isPayloadEncrypted" x-cloak
+                   class="text-xs text-center text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-3 rounded border border-orange-200 dark:border-orange-800 w-full">
+                    {!! __('Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.') !!}
+                </p>
                 <div id="snipto-payload-container"
                      class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap h-auto min-h-[50px] max-h-[calc(100vh-20rem)] overflow-auto">
                 </div>
@@ -88,6 +92,25 @@
                           class="w-full border rounded p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none
                          dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200
                          placeholder-gray-400 dark:placeholder-gray-500"></textarea>
+
+                <div class="flex flex-col items-center space-y-3 w-full max-w-md mx-auto">
+                    <div class="flex items-center justify-center space-x-3 cursor-pointer" @click="encryptSnipto = !encryptSnipto">
+                        <div class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2"
+                             :class="encryptSnipto ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-700'">
+                                <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                      :class="encryptSnipto ? 'translate-x-5' : 'translate-x-0'"></span>
+                        </div>
+                        <span class="text-sm font-medium text-gray-900 dark:text-gray-100 select-none">
+                                {!! __('Use end-to-end encryption') !!}
+                            </span>
+                    </div>
+
+                    <p x-show="!encryptSnipto" x-cloak x-transition.opacity
+                       class="text-xs text-center text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-3 rounded border border-orange-200 dark:border-orange-800 w-full">
+                        {!! __('Warning: Turning off end-to-end encryption means your text will be sent in plain text and will be readable while stored on the server.') !!}
+                    </p>
+                </div>
+
                 <div class="flex flex-col items-center space-y-2">
                     <button @click="submitSnipto()"
                             class="bg-indigo-500 text-white px-6 py-2 rounded shadow hover:bg-indigo-600

@@ -19,6 +19,8 @@ export function sniptoComponent() {
         footerColorClass: '',
         lineWidths: null, // To store line widths for resize without sensitive data
         cleanupFunctions: [], // Array to store cleanup functions
+        encryptSnipto: true,
+        isPayloadEncrypted: true,
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
@@ -71,6 +73,26 @@ export function sniptoComponent() {
                         this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
                     } else if (res.status === 200) {
                         const data = await res.json();
+
+                        if (data.exists && data.is_encrypted === false) {
+                            this.showPayload = true;
+                            this.isPayloadEncrypted = false;
+
+                            const plainBytes = new TextEncoder().encode(data.payload);
+
+                            this.$nextTick(() => {
+                                this.renderPayload(plainBytes);
+                            });
+
+                            if (data.views_remaining !== null && data.views_remaining > 0) {
+                                this.sniptoDisplayFooter = this.t('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.', { ':count': data.views_remaining });
+                                this.footerColorClass = 'text-orange-600 dark:text-orange-400';
+                            }
+
+                            this.loading = false;
+                            return;
+                        }
+
                         if (data.exists) {
                             this.errorMessage = this.t('We can’t open this Snipto. The encryption key is missing in the URL.');
                         } else {
@@ -311,22 +333,39 @@ export function sniptoComponent() {
             if (!this.userInput.trim()) return;
             this.loading = true;
 
-            const shortSecretStr = this.generateShortSecret(16);
-            const shortSecretBytes = new TextEncoder().encode(shortSecretStr);
+            let payloadToSend, nonceHex, secretHash, shortSecretStr;
+            let isEncrypted = false;
 
-            const nonceHex = await this.generateRandomBytes(12);
-            this.nonce = this.hexToBytes(nonceHex);
+            // Only perform encryption if the checkbox is checked
+            if (this.encryptSnipto) {
+                isEncrypted = true;
+                shortSecretStr = this.generateShortSecret(16);
+                const shortSecretBytes = new TextEncoder().encode(shortSecretStr);
 
-            const { encKey, hmacKey } = await this.deriveKeys(shortSecretBytes, nonceHex);
-            this.key = encKey;
-            this.hmacKey = hmacKey;
+                nonceHex = await this.generateRandomBytes(12);
+                this.nonce = this.hexToBytes(nonceHex);
 
-            const userInputBytes = new TextEncoder().encode(this.userInput);
+                const { encKey, hmacKey } = await this.deriveKeys(shortSecretBytes, nonceHex);
+                this.key = encKey;
+                this.hmacKey = hmacKey;
+
+                const userInputBytes = new TextEncoder().encode(this.userInput);
+
+                payloadToSend = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
+                secretHash = await this.sha256Hex(shortSecretBytes);
+
+                // Clean up sensitive bytes
+                userInputBytes.fill(0);
+                shortSecretBytes.fill(0);
+            } else {
+                // Plaintext mode
+                payloadToSend = this.userInput;
+                nonceHex = null;
+                secretHash = null;
+                shortSecretStr = null;
+            }
+
             this.userInput = ''; // Clear string early
-
-            const encryptedBase64 = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
-
-            const secretHash = await this.sha256Hex(shortSecretBytes);
 
             try {
                 const res = await fetch('/api/snipto', {
@@ -338,9 +377,10 @@ export function sniptoComponent() {
                     },
                     body: JSON.stringify({
                         slug: this.slug,
-                        payload: encryptedBase64,
+                        payload: payloadToSend,
                         nonce: nonceHex,
-                        key_hash: secretHash
+                        key_hash: secretHash,
+                        is_encrypted: isEncrypted
                     }),
                     credentials: 'same-origin'
                 });
@@ -359,13 +399,16 @@ export function sniptoComponent() {
                 this.slug = body.slug;
                 this.showForm = false;
                 this.showSuccess = true;
-                this.fullUrl = `${window.location.origin}/${this.slug}#k=${shortSecretStr}`;
+
+                this.fullUrl = `${window.location.origin}/${this.slug}`;
+                if (isEncrypted) {
+                    this.fullUrl += `#k=${shortSecretStr}`;
+                }
+
                 QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
                 this.$refs.fullUrlInput.select();
 
                 this.clearSensitiveCreation();
-                userInputBytes.fill(0);
-                shortSecretBytes.fill(0);
             } catch {
                 this.errorMessage = this.t('An error occurred. Please try again.');
             } finally {

@@ -13,9 +13,10 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $slug
  * @property string $payload
- * @property string $key_hash
- * @property string $nonce
+ * @property string|null $key_hash
+ * @property string|null $nonce
  * @property int|null $views_remaining
+ * @property boolean $is_encrypted
  * @property Carbon $expires_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder|Snipto whereKeyHash($value)
  * @method static Builder|Snipto whereNonce($value)
  * @method static Builder|Snipto whereViewsRemaining($value)
+ * @method static Builder|Snipto whereIsEncrypted($value)
  * @method static Builder|Snipto whereExpiresAt($value)
  * @method static Builder|Snipto whereCreatedAt($value)
  * @method static Builder|Snipto whereUpdatedAt($value)
@@ -44,6 +46,7 @@ class Snipto extends Model
         'key_hash',
         'nonce',
         'views_remaining',
+        'is_encrypted',
         'expires_at',
     ];
 
@@ -53,6 +56,7 @@ class Snipto extends Model
         'key_hash'        => 'string',
         'nonce'           => 'string',
         'views_remaining' => 'integer',
+        'is_encrypted'    => 'boolean',
         'expires_at'      => 'datetime',
     ];
 
@@ -81,5 +85,13 @@ class Snipto extends Model
         }
 
         return $viewRemaining;
+    }
+
+    /**
+     * Indicates whether the Snipto payload is encrypted.
+     */
+    public function isEncrypted(): bool
+    {
+        return $this->is_encrypted;
     }
 }
