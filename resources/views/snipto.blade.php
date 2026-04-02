@@ -17,7 +17,9 @@
                 'An error occurred. Please try again.' => __('An error occurred. Please try again.'),
                 'Failed to render snipto content. Please copy it manually.' => __('Failed to render snipto content. Please copy it manually.'),
                 'Failed to find display element.' => __('Failed to find display element.'),
-                'Could not decrypt the Snipto. Decryption failed or data tampered.' => __('Could not decrypt the Snipto. Decryption failed or data tampered.')
+                'Could not decrypt the Snipto. Decryption failed or data tampered.' => __('Could not decrypt the Snipto. Decryption failed or data tampered.'),
+                'Copied to clipboard!' => __('Copied to clipboard!'),
+                'Copying failed. Please copy manually.' => __('Copying failed. Please copy manually.')
             ]);
         @endphp
     </script>
@@ -61,9 +63,16 @@
             <div x-show="showPayload" x-cloak
                  x-transition.opacity.duration.500ms
                  class="space-y-4 transform transition-all duration-300 hover:scale-[1.01]">
-                <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
-                    {!! __('Here’s your snipto:') !!}
-                </p>
+                <div class="flex justify-between items-start">
+                    <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
+                        {!! __('Here’s your snipto:') !!}
+                    </p>
+                    <button @click="copyToClipboard($event)"
+                            class="bg-indigo-500 text-white px-3 py-1 rounded text-sm shadow hover:bg-indigo-600
+                               hover:shadow-md transition transform duration-150 active:scale-95">
+                        {!! __('Copy') !!}
+                    </button>
+                </div>
                 <p x-show="!isPayloadEncrypted" x-cloak
                    class="text-xs text-center text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-3 rounded border border-orange-200 dark:border-orange-800 w-full">
                     {!! __('Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.') !!}
@@ -167,8 +176,7 @@
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 translate-y-4"
              class="fixed bottom-4 right-4 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900
-            px-4 py-2 rounded shadow-lg z-50 text-sm">
-            Copied to clipboard!
+            px-4 py-2 rounded shadow-lg z-50 text-sm" x-text="toastMessage">
         </div>
     </div>
 @endsection

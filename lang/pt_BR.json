@@ -101,5 +101,7 @@
     "safety tips": "dicas de segurança",
     "Warning: Turning off end-to-end encryption means your text will be sent in plain text and will be readable while stored on the server.": "Aviso: Desativar a criptografia de ponta a ponta significa que seu texto será enviado sem criptografia e ficará legível enquanto estiver armazenado no servidor.",
     "Use end-to-end encryption": "Usar criptografia de ponta a ponta",
-    "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Aviso: Este texto foi compartilhado sem criptografia de ponta a ponta. Ele foi enviado e armazenado sem proteção e poderia ser lido enquanto estava no servidor."
+    "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Aviso: Este texto foi compartilhado sem criptografia de ponta a ponta. Ele foi enviado e armazenado sem proteção e poderia ser lido enquanto estava no servidor.",
+    "Copied to clipboard!": "Copiado!",
+    "Copying failed. Please copy manually.": "Erro ao copiar. Copie manualmente."
 }

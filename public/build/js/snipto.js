@@ -14,6 +14,8 @@ export function sniptoComponent() {
         userInput: '',
         fullUrl: '',
         showToast: false,
+        toastMessage: '',
+        contentHostId: null,
         calledInit: false,
         sniptoDisplayFooter: null,
         footerColorClass: '',
@@ -52,6 +54,8 @@ export function sniptoComponent() {
             if (!this.footerColorClass && this.$refs.sniptoDisplayFooterRef) {
                 this.footerColorClass = this.$refs.sniptoDisplayFooterRef.className;
             }
+
+            this.contentHostId = 'c-' + await this.generateRandomBytes(4);
 
             const shortSecretStr = new URLSearchParams(window.location.hash.substring(1)).get('k');
             let shortSecretBytes = null;
@@ -263,7 +267,8 @@ export function sniptoComponent() {
 
                 // Create sandboxed iframe with no permissions
                 const iframe = document.createElement('iframe');
-                iframe.sandbox = '';
+                iframe.id = this.contentHostId;
+                iframe.sandbox = 'allow-same-origin';
                 iframe.srcdoc = this.trustedTypesPolicy
                     ? this.trustedTypesPolicy.createHTML(srcdoc)
                     : srcdoc;
@@ -585,9 +590,41 @@ export function sniptoComponent() {
 
         copyUrl() {
             navigator.clipboard.writeText(this.fullUrl).then(() => {
-                this.showToast = true;
-                setTimeout(() => this.showToast = false, 2000);
+                this.showToastMessage(this.t('Copied to clipboard!'));
             });
+        },
+
+        copyToClipboard() {
+            const iframe = document.getElementById(this.contentHostId);
+            if (!iframe) {
+                this.showToastMessage(this.t('Copying failed. Please copy manually.'));
+                return;
+            }
+
+            let vaultText = '';
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                const preElement = doc.querySelector('pre');
+                if (!preElement) throw new Error();
+                vaultText = preElement.textContent;
+            } catch {
+                this.showToastMessage(this.t('Copying failed. Please copy manually.'));
+                return;
+            }
+
+            navigator.clipboard.writeText(vaultText)
+                .then(() => {
+                    this.showToastMessage(this.t('Copied to clipboard!'));
+                })
+                .catch(() => {
+                    this.showToastMessage(this.t('Copying failed. Please copy manually.'));
+                });
+        },
+
+        showToastMessage(msg) {
+            this.toastMessage = msg;
+            this.showToast = true;
+            setTimeout(() => this.showToast = false, 2000);
         },
 
         getCsrfToken() {
