@@ -103,5 +103,19 @@
     "Use end-to-end encryption": "Utiliser le chiffrement de bout en bout",
     "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Avertissement : Ce texte a été partagé sans chiffrement de bout en bout. Il a été envoyé et stocké sans protection et pouvait être lu lorsqu’il était sur le serveur.",
     "Copied to clipboard!": "Copié !",
-    "Copying failed. Please copy manually.": "Échec de la copie. Copiez manuellement."
+    "Copying failed. Please copy manually.": "Échec de la copie. Copiez manuellement.",
+    "Secure with": "Sécuriser avec",
+    "Random URL Secret Key": "Clé Secrète dans l'URL",
+    "Password": "Mot de passe",
+    "E2EE disabled": "Chiffrement désactivé",
+    "Enter a password to protect this snippet (min 8 chars)": "Entrez un mot de passe pour protéger ce snipto (min. 8 caract.)",
+    "Notice: This option disables end-to-end encryption! Your snippet will be sent and stored in plaintext. This means it could be read by anyone that intercepts it or has database access.": "Attention : Cette option désactive le chiffrement de bout en bout ! Votre texte sera envoyé et stocké sans protection. Cela signifie qu'il pourra être lu par toute personne l'interceptant ou ayant accès à la base de données.",
+    "This snippet is protected by a password.": "Ce snipto est protégé par un mot de passe.",
+    "Enter the password to decrypt and view the content.": "Entrez le mot de passe pour déchiffrer et afficher le contenu.",
+    "Enter password": "Entrer le mot de passe",
+    "Unlock": "Déverrouiller",
+    "Password must be at least 8 characters long.": "Le mot de passe doit comporter au moins 8 caractères.",
+    "Invalid password. Please try again.": "Mot de passe invalide. Veuillez réessayer.",
+    "This snippet is unavailable or the link is invalid.": "Ce snipto est indisponible ou le lien est invalide.",
+    "You attempted too many times. Please try again in :seconds seconds.": "Vous avez fait trop de tentatives. Veuillez réessayer dans :seconds secondes."
 }

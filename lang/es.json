@@ -103,5 +103,19 @@
     "Use end-to-end encryption": "Usar cifrado de extremo a extremo",
     "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Aviso: Este texto se compartió sin cifrado de extremo a extremo. Fue enviado y almacenado sin protección y podría leerse mientras estaba en el servidor.",
     "Copied to clipboard!": "¡Copiado!",
-    "Copying failed. Please copy manually.": "Error al copiar. Copia manualmente."
+    "Copying failed. Please copy manually.": "Error al copiar. Copia manualmente.",
+    "Secure with": "Asegurar con",
+    "Random URL Secret Key": "Clave Secreta en la URL",
+    "Password": "Contraseña",
+    "E2EE disabled": "Cifrado desactivado",
+    "Enter a password to protect this snippet (min 8 chars)": "Introduce una contraseña para proteger este snipto (mín. 8 caract.)",
+    "Notice: This option disables end-to-end encryption! Your snippet will be sent and stored in plaintext. This means it could be read by anyone that intercepts it or has database access.": "Aviso: ¡Esta opción desactiva el cifrado de extremo a extremo! Su texto se enviará y almacenará sin protección. Esto significa que cualquier persona que lo intercepte o tenga acceso a la base de datos podrá leerlo.",
+    "This snippet is protected by a password.": "Este snipto está protegido por una contraseña.",
+    "Enter the password to decrypt and view the content.": "Introduce la contraseña para descifrar y ver el contenido.",
+    "Enter password": "Introducir contraseña",
+    "Unlock": "Desbloquear",
+    "Password must be at least 8 characters long.": "La contraseña debe tener al menos 8 caracteres.",
+    "Invalid password. Please try again.": "Contraseña inválida. Inténtalo de nuevo.",
+    "This snippet is unavailable or the link is invalid.": "Este snipto no está disponible o el link es inválido.",
+    "You attempted too many times. Please try again in :seconds seconds.": "Has realizado demasiados intentos. Por favor, inténtalo de nuevo en :seconds segundos."
 }

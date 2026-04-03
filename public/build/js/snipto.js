@@ -17,11 +17,16 @@ export function sniptoComponent() {
         toastMessage: '',
         contentHostId: null,
         calledInit: false,
+        isThrottled: false,
+        throttleCountdown: 0,
+        throttleInterval: null,
         sniptoDisplayFooter: null,
         footerColorClass: '',
         lineWidths: null, // To store line widths for resize without sensitive data
         cleanupFunctions: [], // Array to store cleanup functions
-        encryptSnipto: true,
+        protectionType: 1, // Default to Random Secret (1)
+        protectionPassword: '',
+        showPasswordPrompt: false,
         isPayloadEncrypted: true,
 
         async init() {
@@ -42,6 +47,7 @@ export function sniptoComponent() {
 
             if (!this.slug) {
                 this.showForm = true;
+                this.protectionType = 1;
                 this.loading = false;
                 this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                 return;
@@ -63,102 +69,95 @@ export function sniptoComponent() {
                 shortSecretBytes = new TextEncoder().encode(shortSecretStr);
             }
 
-            if (!shortSecretBytes) {
-                try {
-                    const res = await fetch(`/api/snipto/${this.slug}`, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' }
-                    });
-
-                    if (res.status === 404) {
-                        this.showForm = true;
-                        this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
-                    } else if (res.status === 429) {
-                        this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
-                    } else if (res.status === 200) {
-                        const data = await res.json();
-
-                        if (data.exists && data.is_encrypted === false) {
-                            this.showPayload = true;
-                            this.isPayloadEncrypted = false;
-
-                            const plainBytes = new TextEncoder().encode(data.payload);
-
-                            this.$nextTick(() => {
-                                this.renderPayload(plainBytes);
-                            });
-
-                            if (data.views_remaining !== null && data.views_remaining > 0) {
-                                this.sniptoDisplayFooter = this.t('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.', { ':count': data.views_remaining });
-                                this.footerColorClass = 'text-orange-600 dark:text-orange-400';
-                            }
-
-                            this.loading = false;
-                            return;
-                        }
-
-                        if (data.exists) {
-                            this.errorMessage = this.t('We can’t open this Snipto. The encryption key is missing in the URL.');
-                        } else {
-                            this.showForm = true;
-                            this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
-                        }
-                    } else {
-                        this.errorMessage = this.t('An error occurred. Please try again.');
-                    }
-                } catch {
-                    this.errorMessage = this.t('An error occurred. Please try again.');
-                } finally {
-                    this.loading = false;
-                }
-                return;
-            }
-
+            // Initial check to see if slug exists and get protection type
             try {
-                const secretHash = await this.sha256Hex(shortSecretBytes);
-                const res = await fetch(`/api/snipto/${this.slug}?key_hash=${secretHash}`, {
+                const res = await fetch(`/api/snipto/${this.slug}`, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
                 });
 
                 if (res.status === 404) {
                     this.showForm = true;
+                    this.protectionType = 1;
                     this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                     return;
                 } else if (res.status === 429) {
                     this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
                     return;
-                } else if (res.status === 403) {
-                    this.errorMessage = this.t('We cannot open this Snipto. It appears the encryption key is invalid.');
-                    return;
+                } else if (!res.ok) {
+                    throw new Error();
                 }
-
-                if (!res.ok) throw new Error(this.t('An error occurred. Please try again.'));
 
                 const data = await res.json();
+                this.protectionType = data.protection_type;
 
-                this.nonce = this.hexToBytes(data.nonce); // Uint8Array
-                const nonceHex = data.nonce; // Keep hex for HMAC
-                const { encKey, hmacKey } = await this.deriveKeys(shortSecretBytes, nonceHex);
-                this.key = encKey;
-                this.hmacKey = hmacKey;
+                // Handle Protection Modes
+                if (this.protectionType === 0) {
+                    // Mode 0: Plaintext
+                    this.showPayload = true;
+                    this.isPayloadEncrypted = false;
+                    const plainBytes = new TextEncoder().encode(data.payload);
+                    this.$nextTick(() => this.renderPayload(plainBytes));
+                    if (data.views_remaining !== null && data.views_remaining > 0) {
+                        this.sniptoDisplayFooter = this.t('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.', { ':count': data.views_remaining });
+                        this.footerColorClass = 'text-orange-600 dark:text-orange-400';
+                    }
+                } else if (this.protectionType === 1) {
+                    // Mode 1: URL Secret
+                    if (!shortSecretBytes) {
+                        this.errorMessage = this.t('We can’t open this Snipto. The encryption key is missing in the URL.');
+                        return;
+                    }
+                    await this.retrieveAndDecrypt(shortSecretBytes);
+                } else if (this.protectionType === 2) {
+                    // Mode 2: Password
+                    this.showPasswordPrompt = true;
+                }
+            } catch {
+                this.errorMessage = this.t('An error occurred. Please try again.');
+            } finally {
+                if (shortSecretBytes) shortSecretBytes.fill(0);
+                this.loading = false;
+            }
+        },
 
-                let decryptedBuffer;
-                try {
-                    this.payload = this.base64ToBytes(data.payload); // Uint8Array
-                    decryptedBuffer = await this.decryptPayload(this.payload, this.key, this.nonce, this.hmacKey, nonceHex);
-                } catch {
-                    this.errorMessage = this.t('Could not decrypt the Snipto. Decryption failed or data tampered.');
+        async retrieveAndDecrypt(secretBytes) {
+            try {
+                const secretHash = await this.sha256Hex(secretBytes);
+                const res = await fetch(`/api/snipto/${this.slug}?key_hash=${secretHash}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (res.status === 403) {
+                    const msg = this.protectionType === 2
+                        ? this.t('Invalid password. Please try again.')
+                        : this.t('We cannot open this Snipto. It appears the encryption key is invalid.');
+                    this.showToastMessage(msg);
                     return;
                 }
 
+                if (res.status === 429) {
+                    this.handleThrottling(res);
+                    return;
+                }
+
+                if (!res.ok) throw new Error();
+
+                const data = await res.json();
+                this.nonce = this.hexToBytes(data.nonce);
+                const { encKey, hmacKey } = await this.deriveKeys(secretBytes, data.nonce);
+
+                const payloadBytes = this.base64ToBytes(data.payload);
+                const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, this.nonce, hmacKey, data.nonce);
                 const decryptedBytes = new Uint8Array(decryptedBuffer);
 
                 this.showPayload = true;
+                this.showPasswordPrompt = false;
 
                 this.$nextTick(() => {
                     this.renderPayload(decryptedBytes);
-                    decryptedBytes.fill(0);  // Zero out AFTER rendering completes
+                    decryptedBytes.fill(0);
                 });
 
                 if (data.views_remaining !== null && data.views_remaining > 0) {
@@ -168,11 +167,20 @@ export function sniptoComponent() {
 
                 this.clearSensitiveRetrieval();
             } catch (err) {
-                this.errorMessage = err.message;
-            } finally {
-                if (shortSecretBytes) shortSecretBytes.fill(0);
-                this.loading = false;
+                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
             }
+        },
+
+        async unlockWithPassword() {
+            if (!this.protectionPassword.trim()) return;
+            this.loading = true;
+
+            const pwdBytes = new TextEncoder().encode(this.protectionPassword);
+            await this.retrieveAndDecrypt(pwdBytes);
+
+            pwdBytes.fill(0);
+            this.protectionPassword = '';
+            this.loading = false;
         },
 
         renderPayload(decryptedBytes) {
@@ -201,6 +209,7 @@ export function sniptoComponent() {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}';">
                 <style nonce="${nonce}">
                     html, body {
                         margin: 0;
@@ -318,6 +327,9 @@ export function sniptoComponent() {
         destroy() {
             this.cleanupFunctions.forEach(fn => fn());
             this.cleanupFunctions = [];
+            if (this.throttleInterval) {
+                clearInterval(this.throttleInterval);
+            }
             this.clearSensitiveRetrieval();
         },
 
@@ -336,32 +348,46 @@ export function sniptoComponent() {
 
         async submitSnipto() {
             if (!this.userInput.trim()) return;
+
+            const finalProtectionType = parseInt(this.protectionType);
+
+            // Validation: Password length
+            if (finalProtectionType === 2 && this.protectionPassword.length < 8) {
+                this.showToastMessage(this.t('Password must be at least 8 characters long.'));
+                return;
+            }
+
             this.loading = true;
 
             let payloadToSend, nonceHex, secretHash, shortSecretStr;
-            let isEncrypted = false;
 
-            // Only perform encryption if the checkbox is checked
-            if (this.encryptSnipto) {
-                isEncrypted = true;
-                shortSecretStr = this.generateShortSecret(16);
-                const shortSecretBytes = new TextEncoder().encode(shortSecretStr);
+            // Encryption Logic based on Mode
+            if (finalProtectionType === 1 || finalProtectionType === 2) {
+                // E2EE Mode (Secret or Password)
+                let secretSourceStr;
+                if (finalProtectionType === 1) {
+                    shortSecretStr = this.generateShortSecret(16);
+                    secretSourceStr = shortSecretStr;
+                } else {
+                    secretSourceStr = this.protectionPassword;
+                    shortSecretStr = null;
+                }
 
+                const secretBytes = new TextEncoder().encode(secretSourceStr);
                 nonceHex = await this.generateRandomBytes(12);
                 this.nonce = this.hexToBytes(nonceHex);
 
-                const { encKey, hmacKey } = await this.deriveKeys(shortSecretBytes, nonceHex);
+                const { encKey, hmacKey } = await this.deriveKeys(secretBytes, nonceHex);
                 this.key = encKey;
                 this.hmacKey = hmacKey;
 
                 const userInputBytes = new TextEncoder().encode(this.userInput);
-
                 payloadToSend = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
-                secretHash = await this.sha256Hex(shortSecretBytes);
+                secretHash = await this.sha256Hex(secretBytes);
 
                 // Clean up sensitive bytes
                 userInputBytes.fill(0);
-                shortSecretBytes.fill(0);
+                secretBytes.fill(0);
             } else {
                 // Plaintext mode
                 payloadToSend = this.userInput;
@@ -370,7 +396,8 @@ export function sniptoComponent() {
                 shortSecretStr = null;
             }
 
-            this.userInput = ''; // Clear string early
+            this.userInput = '';
+            this.protectionPassword = '';
 
             try {
                 const res = await fetch('/api/snipto', {
@@ -385,7 +412,7 @@ export function sniptoComponent() {
                         payload: payloadToSend,
                         nonce: nonceHex,
                         key_hash: secretHash,
-                        is_encrypted: isEncrypted
+                        protection_type: finalProtectionType
                     }),
                     credentials: 'same-origin'
                 });
@@ -406,7 +433,7 @@ export function sniptoComponent() {
                 this.showSuccess = true;
 
                 this.fullUrl = `${window.location.origin}/${this.slug}`;
-                if (isEncrypted) {
+                if (finalProtectionType === 1) {
                     this.fullUrl += `#k=${shortSecretStr}`;
                 }
 
@@ -624,7 +651,31 @@ export function sniptoComponent() {
         showToastMessage(msg) {
             this.toastMessage = msg;
             this.showToast = true;
-            setTimeout(() => this.showToast = false, 2000);
+            setTimeout(() => this.showToast = false, 3000);
+        },
+
+        handleThrottling(res) {
+            const resetTimestamp = parseInt(res.headers.get('X-RateLimit-Reset'));
+            if (!resetTimestamp) return;
+
+            const now = Math.floor(Date.now() / 1000);
+            this.throttleCountdown = Math.max(0, resetTimestamp - now);
+
+            if (this.throttleCountdown <= 0) return;
+
+            this.isThrottled = true;
+            this.loading = false;
+
+            if (this.throttleInterval) clearInterval(this.throttleInterval);
+
+            this.throttleInterval = setInterval(() => {
+                this.throttleCountdown--;
+                if (this.throttleCountdown <= 0) {
+                    clearInterval(this.throttleInterval);
+                    this.isThrottled = false;
+                    this.throttleInterval = null;
+                }
+            }, 1000);
         },
 
         getCsrfToken() {

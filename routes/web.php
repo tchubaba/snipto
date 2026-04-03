@@ -24,10 +24,10 @@ Route::prefix('api/snipto')->group(function () {
         ->middleware('throttle:10,1');
     Route::get('{slug}', [ApiController::class, 'show'])
         ->where('slug', '[A-Za-z0-9_-]+')
-        ->middleware('throttle:20,1');
+        ->middleware('throttle:6,1');
     Route::post('{slug}/viewed', [ApiController::class, 'markViewed'])
         ->where('slug', '[A-Za-z0-9_-]+')
-        ->middleware('throttle:20,1');
+        ->middleware('throttle:6,1');
 });
 
 Route::post('/locale', function (\Illuminate\Http\Request $request) {

@@ -103,5 +103,19 @@
     "Use end-to-end encryption": "Usar criptografia de ponta a ponta",
     "Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.": "Aviso: Este texto foi compartilhado sem criptografia de ponta a ponta. Ele foi enviado e armazenado sem proteção e poderia ser lido enquanto estava no servidor.",
     "Copied to clipboard!": "Copiado!",
-    "Copying failed. Please copy manually.": "Erro ao copiar. Copie manualmente."
+    "Copying failed. Please copy manually.": "Erro ao copiar. Copie manualmente.",
+    "Secure with": "Proteger com",
+    "Random URL Secret Key": "Chave Secreta na URL",
+    "Password": "Senha",
+    "E2EE disabled": "Criptografia desativada",
+    "Enter a password to protect this snippet (min 8 chars)": "Digite uma senha para proteger este snipto (mín. 8 caracteres)",
+    "Notice: This option disables end-to-end encryption! Your snippet will be sent and stored in plaintext. This means it could be read by anyone that intercepts it or has database access.": "Atenção: Esta opção desativa a criptografia de ponta a ponta! Seu texto será enviado e armazenado sem proteção. Isso significa que ele poderá ser lido por qualquer pessoa que o intercepte ou que tenha acesso ao banco de dados.",
+    "This snippet is protected by a password.": "Este snipto está protegido por uma senha.",
+    "Enter the password to decrypt and view the content.": "Digite a senha para descriptografar e visualizar o conteúdo.",
+    "Enter password": "Digite a senha",
+    "Unlock": "Desbloquear",
+    "Password must be at least 8 characters long.": "A senha deve ter pelo menos 8 caracteres.",
+    "Invalid password. Please try again.": "Senha inválida. Tente novamente.",
+    "This snippet is unavailable or the link is invalid.": "Este snipto não está disponível ou o link é inválido.",
+    "You attempted too many times. Please try again in :seconds seconds.": "Você fez muitas tentativas. Por favor, tente novamente em :seconds segundos."
 }
