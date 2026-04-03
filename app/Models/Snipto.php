@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProtectionType;
 use Carbon\Carbon;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $key_hash
  * @property string|null $nonce
  * @property int|null $views_remaining
- * @property boolean $is_encrypted
+ * @property ProtectionType $protection_type
  * @property Carbon $expires_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -27,7 +28,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder|Snipto whereKeyHash($value)
  * @method static Builder|Snipto whereNonce($value)
  * @method static Builder|Snipto whereViewsRemaining($value)
- * @method static Builder|Snipto whereIsEncrypted($value)
+ * @method static Builder|Snipto whereProtectionType($value)
  * @method static Builder|Snipto whereExpiresAt($value)
  * @method static Builder|Snipto whereCreatedAt($value)
  * @method static Builder|Snipto whereUpdatedAt($value)
@@ -46,7 +47,7 @@ class Snipto extends Model
         'key_hash',
         'nonce',
         'views_remaining',
-        'is_encrypted',
+        'protection_type',
         'expires_at',
     ];
 
@@ -56,7 +57,7 @@ class Snipto extends Model
         'key_hash'        => 'string',
         'nonce'           => 'string',
         'views_remaining' => 'integer',
-        'is_encrypted'    => 'boolean',
+        'protection_type' => ProtectionType::class,
         'expires_at'      => 'datetime',
     ];
 
@@ -92,6 +93,14 @@ class Snipto extends Model
      */
     public function isEncrypted(): bool
     {
-        return $this->is_encrypted;
+        return $this->protection_type !== ProtectionType::Plaintext;
+    }
+
+    /**
+     * Indicates whether the Snipto is protected by a password.
+     */
+    public function isPasswordProtected(): bool
+    {
+        return $this->protection_type === ProtectionType::Password;
     }
 }

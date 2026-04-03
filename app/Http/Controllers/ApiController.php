@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\ProtectionType;
 use App\Models\Snipto;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationException;
 use Log;
 use Throwable;
@@ -50,15 +52,16 @@ class ApiController extends Controller
             $snipto->delete();
             return response()->json([
                 'success' => false,
-                'message' => 'Snipto expired',
-            ], 410);
+                'exists'  => false,
+                'message' => 'Snipto not found',
+            ], 404);
         }
 
         if ( ! $snipto->isEncrypted()) {
             return response()->json([
                 'success'         => true,
                 'exists'          => true,
-                'is_encrypted'    => false,
+                'protection_type' => $snipto->protection_type->value,
                 'payload'         => $snipto->payload,
                 'views_remaining' => $snipto->decrementViews(),
             ]);
@@ -73,10 +76,9 @@ class ApiController extends Controller
 
         // The base response for when a snipto is found.
         $response = [
-            'success'      => true,
-            'exists'       => true,
-            'is_encrypted' => true,
-//            'expires_at' => $snipto->expires_at,
+            'success'         => true,
+            'exists'          => true,
+            'protection_type' => $snipto->protection_type->value,
         ];
 
         // If the key hash is present and valid, add the payload, decrement views and include view_remaining.
@@ -110,16 +112,16 @@ class ApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $isEncrypted = $request->boolean('is_encrypted');
+        $protectionType = ProtectionType::tryFrom((int)$request->input('protection_type'));
 
         $rules = [
             'slug'            => 'required|string|max:100|unique:sniptos,slug',
-            'is_encrypted'    => 'required|boolean',
+            'protection_type' => ['required', new Enum(ProtectionType::class)],
             'views_remaining' => 'nullable|integer|min:1|max:200',
             'expires_at'      => 'nullable|date|after:now', // TODO: perhaps use pre-defined values like 1 day, 1 week, etc
         ];
 
-        if ($isEncrypted) {
+        if ($protectionType && $protectionType !== ProtectionType::Plaintext) {
             $rules['payload'] = [
                 'required',
                 'string',
