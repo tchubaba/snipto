@@ -12,7 +12,8 @@
 - **Instant Snippet Creation:** No “create” page — simply visit a URL and start typing.
 - **End-to-End Encryption (E2EE):** Content is encrypted client-side by default. The server never sees the raw snippet or the encryption key.
 - **Optional Password Protection:** Secure your snippets with a personal password.
-- **Ephemeral Snippets:** Snippets are deleted after the first view and expire automatically after 1 hour.
+- **Customizable Expiration:** Choose how long your snippet stays available (up to 1 week) when using password protection.
+- **Ephemeral Snippets:** Snippets are deleted after the first view and expire automatically after the chosen time (default 1 hour).
 - **QR Code Generation:** Generate a QR code upon snippet creation for easy mobile sharing.
 - **Security Focused:** Built with Laravel 12, Alpine.js (CSP-compliant build), and strict Content Security Policy (CSP) headers.
 
@@ -26,9 +27,9 @@
     - If it exists, Snipto identifies the protection mode. If password-protected, the user is prompted for the password before the payload is retrieved.
 3. **Snippet Sharing Modes:**
     - **Random Secret (Default):** The snippet is encrypted in the browser with a randomly generated 256-bit key. The key is appended to the URL as `#k=`. The server never receives this key.
-    - **Password Protected:** The snippet is encrypted using a user-provided password as the key. The recipient must enter the password to view the content.
+    - **Password Protected:** The snippet is encrypted using a user-provided password as the key. The recipient must enter the password to view the content. Password-protected snippets allow for customizable expiration times.
     - **E2EE Disabled (Plaintext):** Users can opt-out of encryption. In this mode, the snippet is sent to the server as-is. The UI provides a clear warning when this mode is active.
-4. **Automatic Expiration:** Snippets are single-use only — once they are successfully viewed, they are removed from the database. All snippets expire automatically 1 hour after creation.
+4. **Automatic Expiration:** Snippets are single-use only — once they are successfully viewed, they are removed from the database. All snippets expire automatically 1 hour after creation (or up to 1 week if configured in password mode).
 5. **Secure Rendering:** Decrypted content is rendered inside a sandboxed iframe using Trusted Types to prevent XSS.
 
 ---

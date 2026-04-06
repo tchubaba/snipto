@@ -26,8 +26,11 @@ export function sniptoComponent() {
         cleanupFunctions: [], // Array to store cleanup functions
         protectionType: 1, // Default to Random Secret (1)
         protectionPassword: '',
+        passwordBlacklist: [],
+        expirationValue: '1h',
         showPasswordPrompt: false,
         isPayloadEncrypted: true,
+        showWeakPasswordModal: false,
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
@@ -49,6 +52,7 @@ export function sniptoComponent() {
                 this.showForm = true;
                 this.protectionType = 1;
                 this.loading = false;
+                this.loadBlacklist();
                 this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                 return;
             }
@@ -79,6 +83,7 @@ export function sniptoComponent() {
                 if (res.status === 404) {
                     this.showForm = true;
                     this.protectionType = 1;
+                    this.loadBlacklist();
                     this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                     return;
                 } else if (res.status === 429) {
@@ -118,6 +123,19 @@ export function sniptoComponent() {
             } finally {
                 if (shortSecretBytes) shortSecretBytes.fill(0);
                 this.loading = false;
+            }
+        },
+
+        async loadBlacklist() {
+            try {
+                const res = await fetch('/blacklist.txt');
+                if (!res.ok) return;
+                const text = await res.text();
+                this.passwordBlacklist = text.split('\n')
+                    .map(p => p.trim().toLowerCase())
+                    .filter(p => p.length >= 8);
+            } catch (e) {
+                console.warn('Failed to load password blacklist');
             }
         },
 
@@ -181,6 +199,13 @@ export function sniptoComponent() {
             pwdBytes.fill(0);
             this.protectionPassword = '';
             this.loading = false;
+        },
+
+        closeWeakPasswordModal() {
+            this.showWeakPasswordModal = false;
+            this.$nextTick(() => {
+                this.$refs.protectionPasswordField?.focus();
+            });
         },
 
         renderPayload(decryptedBytes) {
@@ -346,18 +371,27 @@ export function sniptoComponent() {
             }
         },
 
-        async submitSnipto() {
+        async submitSnipto(bypass = false) {
             if (!this.userInput.trim()) return;
 
             const finalProtectionType = parseInt(this.protectionType);
 
             // Validation: Password length
-            if (finalProtectionType === 2 && this.protectionPassword.length < 8) {
-                this.showToastMessage(this.t('Password must be at least 8 characters long.'));
-                return;
+            if (finalProtectionType === 2) {
+                if (this.protectionPassword.length < 8) {
+                    this.showToastMessage(this.t('Password must be at least 8 characters long.'));
+                    return;
+                }
+
+                // Check for weak password unless bypassed
+                if (!bypass && this.analyzePasswordStrength(this.protectionPassword) < 3) {
+                    this.showWeakPasswordModal = true;
+                    return;
+                }
             }
 
             this.loading = true;
+            this.showWeakPasswordModal = false;
 
             let payloadToSend, nonceHex, secretHash, shortSecretStr;
 
@@ -412,7 +446,8 @@ export function sniptoComponent() {
                         payload: payloadToSend,
                         nonce: nonceHex,
                         key_hash: secretHash,
-                        protection_type: finalProtectionType
+                        protection_type: finalProtectionType,
+                        expiration: this.expirationValue
                     }),
                     credentials: 'same-origin'
                 });
@@ -676,6 +711,38 @@ export function sniptoComponent() {
                     this.throttleInterval = null;
                 }
             }, 1000);
+        },
+
+        analyzePasswordStrength(pwd) {
+            const lowerInput = pwd.toLowerCase();
+
+            // 1. ABSOLUTE FAIL: Match in blacklist
+            if (this.passwordBlacklist.includes(lowerInput)) return 0;
+
+            // 2. ABSOLUTE FAIL: Root word match (e.g., "Sunshine88" -> "sunshine")
+            const rootWord = lowerInput.replace(/[^a-z]/g, '');
+            if (rootWord.length >= 4 && this.passwordBlacklist.includes(rootWord)) return 0;
+
+            // 3. HEURISTIC SCORING
+            let score = 0;
+            if (pwd.length >= 10) score++;
+            if (pwd.length >= 14) score++;
+            if (pwd.length >= 20) score++;
+
+            // Diversity points
+            if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
+            if (/[0-9]/.test(pwd)) score++;
+            if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+            // 4. PENALTIES
+            // Deduct for predictable endings (e.g., "Password123", "Admin!")
+            if (/[a-z]{4,}[0-9!@#$%^&*]{1,3}$/i.test(pwd)) score -= 2;
+
+            // Deduct for sequences or repeats
+            if (/1234|abcd|qwerty/i.test(pwd)) score -= 2;
+            if (/(\w)\1{2,}/.test(pwd)) score -= 1; // repeating chars like 'aaa'
+
+            return Math.max(0, score);
         },
 
         getCsrfToken() {

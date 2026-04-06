@@ -26,7 +26,16 @@
                 'Invalid password. Please try again.' => __('Invalid password. Please try again.'),
                 'This snippet is unavailable or the link is invalid.' => __('This snippet is unavailable or the link is invalid.'),
                 'Password must be at least 8 characters long.' => __('Password must be at least 8 characters long.'),
-                'You attempted too many times. Please try again in :seconds seconds.' => __('You attempted too many times. Please try again in :seconds seconds.')
+                'You attempted too many times. Please try again in :seconds seconds.' => __('You attempted too many times. Please try again in :seconds seconds.'),
+                'Expire after:' => __('Expire after:'),
+                '1 Hour' => __('1 Hour'),
+                '1 Day' => __('1 Day'),
+                '1 Week' => __('1 Week'),
+                'This snippet will expire in 1 hour.' => __('This snippet will expire in 1 hour.'),
+                'Caution: Weak Password Detected' => __('Caution: Weak Password Detected'),
+                'This password is easy to guess, which makes the encryption much easier to break. For better security, we recommend a longer or more varied password.' => __('This password is easy to guess, which makes the encryption much easier to break. For better security, we recommend a longer or more varied password.'),
+                'Go back and change' => __('Go back and change'),
+                'Use anyway' => __('Use anyway')
             ]);
         @endphp
     </script>
@@ -180,15 +189,51 @@
 
                     <!-- Conditional Content -->
                     <div class="w-full grid transition-all duration-300 ease-in-out" 
-                         :class="protectionType != 1 ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
+                         :class="protectionType != 1 ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[1fr] opacity-100'">
                         <div class="overflow-hidden">
+                            <!-- Expiration Info for non-password modes -->
+                            <div x-show="protectionType != 2" x-cloak
+                                 class="flex items-center justify-center space-x-2 py-2 text-gray-500 dark:text-gray-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span class="text-xs font-medium">{!! __('This snippet will expire in 1 hour.') !!}</span>
+                            </div>
+
                             <!-- Password Input -->
                             <div x-show="protectionType === 2" x-cloak 
                                  x-transition:enter="transition ease-out duration-300 delay-100"
                                  x-transition:enter-start="opacity-0 scale-95"
                                  x-transition:enter-end="opacity-100 scale-100"
-                                 class="pt-4">
+                                 class="pt-4 space-y-4">
+                                <div class="flex items-center justify-center space-x-3">
+                                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                        {!! __('Expire after:') !!}
+                                    </p>
+                                    <div class="flex p-0.5 bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <button @click="expirationValue = '1h'" 
+                                                type="button"
+                                                :class="expirationValue === '1h' ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500'"
+                                                class="py-1 px-2 rounded-md text-[10px] uppercase tracking-wider font-bold transition-all duration-200">
+                                            {!! __('1 Hour') !!}
+                                        </button>
+                                        <button @click="expirationValue = '1d'" 
+                                                type="button"
+                                                :class="expirationValue === '1d' ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500'"
+                                                class="py-1 px-2 rounded-md text-[10px] uppercase tracking-wider font-bold transition-all duration-200">
+                                            {!! __('1 Day') !!}
+                                        </button>
+                                        <button @click="expirationValue = '1w'" 
+                                                type="button"
+                                                :class="expirationValue === '1w' ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500'"
+                                                class="py-1 px-2 rounded-md text-[10px] uppercase tracking-wider font-bold transition-all duration-200">
+                                            {!! __('1 Week') !!}
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <input type="password" x-model="protectionPassword" 
+                                       x-ref="protectionPasswordField"
                                        placeholder="{{ __('Enter a password to protect this snippet (min 8 chars)') }}"
                                        class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
                             </div>
@@ -264,6 +309,66 @@
              x-transition:leave-end="opacity-0 scale-90"
              class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900
             px-8 py-4 rounded-2xl shadow-2xl z-50 text-base font-medium whitespace-nowrap border border-white/10 dark:border-black/10 backdrop-blur-sm text-center" x-text="toastMessage">
+        </div>
+
+        <!-- Weak Password Warning Modal -->
+        <div x-show="showWeakPasswordModal" x-cloak
+             class="fixed inset-0 z-[60] overflow-y-auto"
+             aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            
+            <!-- Backdrop -->
+            <div x-show="showWeakPasswordModal" 
+                 x-transition:enter="ease-out duration-300" 
+                 x-transition:enter-start="opacity-0" 
+                 x-transition:enter-end="opacity-100" 
+                 x-transition:leave="ease-in duration-200" 
+                 x-transition:leave-start="opacity-100" 
+                 x-transition:leave-end="opacity-0" 
+                 class="fixed inset-0 bg-gray-500/75 dark:bg-gray-900/80 transition-opacity backdrop-blur-sm" 
+                 aria-hidden="true"></div>
+
+            <!-- Centering container -->
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+                <span class="hidden sm:inline-block sm:align-middle sm:min-h-screen" aria-hidden="true">&#8203;</span>
+
+                <!-- Modal Content -->
+                <div x-show="showWeakPasswordModal" 
+                     x-transition:enter="ease-out duration-300" 
+                     x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
+                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+                     x-transition:leave="ease-in duration-200" 
+                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
+                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     class="relative inline-block align-bottom bg-white dark:bg-gray-800 rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-200 dark:border-gray-700 z-10">
+                    <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/30 sm:mx-0 sm:h-10 sm:w-10">
+                                <svg class="h-6 w-6 text-orange-600 dark:text-orange-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                <h3 class="text-lg leading-6 font-bold text-gray-900 dark:text-gray-100" id="modal-title">
+                                    {!! __('Caution: Weak Password Detected') !!}
+                                </h3>
+                                <div class="mt-2">
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        {!! __('This password is easy to guess, which makes the encryption much easier to break. For better security, we recommend a longer or more varied password.') !!}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                        <button type="button" @click="closeWeakPasswordModal()" class="w-full inline-flex justify-center rounded-xl border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:w-auto sm:text-sm transition-all duration-200">
+                            {!! __('Go back and change') !!}
+                        </button>
+                        <button type="button" @click="submitSnipto(true)" class="mt-3 w-full inline-flex justify-center rounded-xl border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm transition-all duration-200">
+                            {!! __('Use anyway') !!}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 @endsection

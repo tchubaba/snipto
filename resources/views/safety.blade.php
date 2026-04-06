@@ -30,10 +30,13 @@
             <div>
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Share Sniptos Carefully') !!}</h2>
                 <p class="mt-2">
-                    {!! __('Always send the snippet URL (including the secret key, the #k= part) through secure channels like Signal or encrypted messaging.') !!}
+                    {!! __('Always send the snippet URL through secure channels like Signal or encrypted messaging.') !!}
                 </p>
                 <p class="mt-2">
-                    {!! __('If you must share it via an unsecured channel (like e-mail or SMS), make sure the recipient opens and reads the Snipto right away. Since Sniptos are deleted once viewed, this limits exposure.') !!}
+                    {!! __('Using <strong>Password Protection</strong> adds an extra layer of security because the encryption key is not part of the URL. This means even if the link is intercepted, the content remains secure without the password.') !!}
+                </p>
+                <p class="mt-2">
+                    {!! __('If you must share a link via an unsecured channel (like e-mail or SMS), make sure the recipient opens and reads the Snipto right away. Since Sniptos are deleted once viewed, this limits exposure.') !!}
                 </p>
                 <p class="mt-2">
                     {!! __('Educate recipients to also follow the same safety practices, like using private browsing and trusted devices.') !!}

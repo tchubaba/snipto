@@ -118,7 +118,7 @@ class ApiController extends Controller
             'slug'            => 'required|string|max:100|unique:sniptos,slug',
             'protection_type' => ['required', new Enum(ProtectionType::class)],
             'views_remaining' => 'nullable|integer|min:1|max:200',
-            'expires_at'      => 'nullable|date|after:now', // TODO: perhaps use pre-defined values like 1 day, 1 week, etc
+            'expiration'      => 'nullable|string|in:1h,1d,1w',
         ];
 
         if ($protectionType && $protectionType !== ProtectionType::Plaintext) {
@@ -149,11 +149,20 @@ class ApiController extends Controller
             ], 422);
         }
 
-        // Forcing expiration date to always be 1 hour from now.
+        // Logic for expiration
+        $expiration = $request->input('expiration', '1h');
+        $expiresAt = Carbon::now()->addHour();
+
+        if ($protectionType === ProtectionType::Password) {
+            $expiresAt = match ($expiration) {
+                '1d'    => Carbon::now()->addDay(),
+                '1w'    => Carbon::now()->addWeek(),
+                default => Carbon::now()->addHour(),
+            };
+        }
+
         $validated = $validator->validated();
-        //        if (empty($validated['expires_at'])) {
-        $validated['expires_at'] = Carbon::now()->addHour();
-        //        }
+        $validated['expires_at'] = $expiresAt;
 
         // Forcing all sniptos to have only one view for now.
         $validated['views_remaining'] = 1;
