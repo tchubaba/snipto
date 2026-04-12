@@ -10,19 +10,14 @@ return [
      * any class that implements `Spatie\Csp\Preset`
      */
     'presets' => [
-        Spatie\Csp\Presets\Basic::class,
+        App\Support\Csp\SniptoPolicy::class,
     ],
 
     /**
      * Register additional global CSP directives here.
      */
     'directives' => [
-        [Directive::CONNECT, [Keyword::SELF, env('APP_ENV')]],
-        [Directive::FRAME_ANCESTORS, [Keyword::NONE]],
-        [Directive::DEFAULT, [Keyword::NONE]],
-        [Directive::MANIFEST, [Keyword::SELF]],
-        [Directive::REPORT_TO, ['csp-endpoint']],
-        [Directive::REQUIRE_TRUSTED_TYPES_FOR, [Keyword::SCRIPT]],
+        //
     ],
 
     /*

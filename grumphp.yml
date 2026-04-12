@@ -1,6 +1,7 @@
 grumphp:
   hooks_dir: ~
   hooks_preset: local
+  fixer: false
   git_hook_variables:
     VAGRANT_HOST_DIR: .
     VAGRANT_PROJECT_DIR: /var/www/html
@@ -9,5 +10,10 @@ grumphp:
     phpcsfixer:
       config: .php-cs-fixer.php
       triggered_by: [php]
+    phpunit:
+      config_file: phpunit.xml
+      testsuite: ~
+      group: []
+      always_execute: true
   testsuites: []
   extensions: []
