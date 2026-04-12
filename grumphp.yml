@@ -1,0 +1,13 @@
+grumphp:
+  hooks_dir: ~
+  hooks_preset: local
+  git_hook_variables:
+    VAGRANT_HOST_DIR: .
+    VAGRANT_PROJECT_DIR: /var/www/html
+    EXEC_GRUMPHP_COMMAND: docker compose exec -T app
+  tasks:
+    phpcsfixer:
+      config: .php-cs-fixer.php
+      triggered_by: [php]
+  testsuites: []
+  extensions: []

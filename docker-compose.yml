@@ -1,54 +1,55 @@
 services:
-    laravel.test:
+    app:
         build:
-            context: ./vendor/laravel/sail/runtimes/8.3
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: docker/Dockerfile
             args:
-                WWWGROUP: '${WWWGROUP:-1000}'
-                NODE_VERSION: '20'
-        image: sail-8.3/app
+                user: snipto
+                uid: 1000
+        image: snipto/app
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
             - '${APP_PORT:-80}:80'
             - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
         environment:
-            WWWUSER: '${WWWUSER:-1000}'
             LARAVEL_SAIL: 1
-            XDEBUG_MODE: 'debug'
-            XDEBUG_CONFIG: 'client_host=host.docker.internal start_with_request=yes'
+            XDEBUG_MODE: 'debug,develop'
+            XDEBUG_CONFIG: 'client_host=host.docker.internal client_port=9003 start_with_request=yes'
             PHP_IDE_CONFIG: 'serverName=Snipto'
-            IGNITION_LOCAL_SITES_PATH: '${PWD}'
         volumes:
             - '.:/var/www/html'
         networks:
             - sail
         depends_on:
             - mariadb
+        command: >
+            bash -c "
+                if [ ! -f .env ]; then cp .env.example .env && sed -i 's/DB_CONNECTION=sqlite/DB_CONNECTION=mysql/' .env && sed -i 's/# DB_HOST=127.0.0.1/DB_HOST=mariadb/' .env && sed -i 's/# DB_PORT=3306/DB_PORT=3306/' .env && sed -i 's/# DB_DATABASE=laravel/DB_DATABASE=snipto/' .env && sed -i 's/# DB_USERNAME=root/DB_USERNAME=snipto/' .env && sed -i 's/# DB_PASSWORD=/DB_PASSWORD=secret/' .env; fi &&
+                composer install --no-interaction &&
+                if ! grep -q \"APP_KEY=base64\" .env; then php artisan key:generate; fi &&
+                npm install &&
+                php artisan migrate --force &&
+                (php ./vendor/bin/grumphp git:init || true) &&
+                (php artisan queue:listen --tries=1 &) &&
+                (npm run dev &) &&
+                php artisan serve --host=0.0.0.0 --port=80
+            "
     mariadb:
         image: 'mariadb:11'
         ports:
             - '${FORWARD_DB_PORT:-3306}:3306'
         environment:
-            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_ROOT_PASSWORD: 'secret'
             MYSQL_ROOT_HOST: '%'
-            MYSQL_DATABASE: '${DB_DATABASE}'
-            MYSQL_USER: '${DB_USERNAME}'
-            MYSQL_PASSWORD: '${DB_PASSWORD}'
+            MYSQL_DATABASE: 'snipto'
+            MYSQL_USER: 'snipto'
+            MYSQL_PASSWORD: 'secret'
             MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
         volumes:
             - 'sail-mariadb:/var/lib/mysql'
-            - './vendor/laravel/sail/database/mariadb/create-testing-database.sh:/docker-entrypoint-initdb.d/10-create-testing-database.sh'
         networks:
             - sail
-        healthcheck:
-            test:
-                - CMD
-                - healthcheck.sh
-                - '--connect'
-                - '--innodb_initialized'
-            retries: 3
-            timeout: 5s
 networks:
     sail:
         driver: bridge

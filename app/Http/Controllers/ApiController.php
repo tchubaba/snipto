@@ -151,7 +151,7 @@ class ApiController extends Controller
 
         // Logic for expiration
         $expiration = $request->input('expiration', '1h');
-        $expiresAt = Carbon::now()->addHour();
+        $expiresAt  = Carbon::now()->addHour();
 
         if ($protectionType === ProtectionType::Password) {
             $expiresAt = match ($expiration) {
@@ -161,7 +161,7 @@ class ApiController extends Controller
             };
         }
 
-        $validated = $validator->validated();
+        $validated               = $validator->validated();
         $validated['expires_at'] = $expiresAt;
 
         // Forcing all sniptos to have only one view for now.

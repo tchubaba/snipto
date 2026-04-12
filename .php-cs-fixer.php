@@ -6,7 +6,14 @@ use PhpCsFixer\Config;
 use PhpCsFixer\Finder;
 
 $finder = (new Finder())
-    ->in(__DIR__);
+    ->in(__DIR__)
+    ->exclude([
+        'storage',
+        'bootstrap/cache',
+        'vendor',
+    ])
+    ->notPath('public/index.php')
+    ->notPath('artisan');
 
 return (new Config())
     ->setRules([
