@@ -14,6 +14,7 @@ Route::view('/faq', 'faq');
 Route::view('/contact', 'contact');
 Route::view('/terms', 'terms');
 Route::view('/safety', 'safety');
+Route::view('/sniptoid', 'sniptoid')->name('sniptoid');
 
 // ---------------------------
 // Snipto API routes

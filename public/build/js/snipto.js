@@ -1,3 +1,14 @@
+// Feature detection for X25519 Web Crypto support
+async function supportsX25519() {
+    try {
+        await crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveKey', 'deriveBits']);
+        return true;
+    } catch {
+        return false;
+    }
+}
+window.supportsX25519 = supportsX25519;
+
 export function sniptoComponent() {
     return {
         slug: null,
@@ -20,8 +31,6 @@ export function sniptoComponent() {
         isThrottled: false,
         throttleCountdown: 0,
         throttleInterval: null,
-        sniptoDisplayFooter: null,
-        footerColorClass: '',
         lineWidths: null, // To store line widths for resize without sensitive data
         cleanupFunctions: [], // Array to store cleanup functions
         protectionType: 1, // Default to Random Secret (1)
@@ -31,6 +40,12 @@ export function sniptoComponent() {
         showPasswordPrompt: false,
         isPayloadEncrypted: true,
         showWeakPasswordModal: false,
+        sniptoIdInput: '',
+        sniptoIdPassphrase: '',
+        x25519Supported: null,
+        senderPublicKey: null,
+        keyProviderType: null,
+        showSniptoIdPrompt: false,
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
@@ -48,6 +63,8 @@ export function sniptoComponent() {
                 document.documentElement.classList.add('dark');
             }
 
+            this.x25519Supported = await supportsX25519();
+
             if (!this.slug) {
                 this.showForm = true;
                 this.protectionType = 1;
@@ -55,14 +72,6 @@ export function sniptoComponent() {
                 this.loadBlacklist();
                 this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                 return;
-            }
-
-            if (this.sniptoDisplayFooter === null && this.$refs.sniptoDisplayFooterRef) {
-                this.sniptoDisplayFooter = this.$refs.sniptoDisplayFooterRef.textContent.trim();
-            }
-
-            if (!this.footerColorClass && this.$refs.sniptoDisplayFooterRef) {
-                this.footerColorClass = this.$refs.sniptoDisplayFooterRef.className;
             }
 
             this.contentHostId = 'c-' + await this.generateRandomBytes(4);
@@ -103,10 +112,6 @@ export function sniptoComponent() {
                     this.isPayloadEncrypted = false;
                     const plainBytes = new TextEncoder().encode(data.payload);
                     this.$nextTick(() => this.renderPayload(plainBytes));
-                    if (data.views_remaining !== null && data.views_remaining > 0) {
-                        this.sniptoDisplayFooter = this.t('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.', { ':count': data.views_remaining });
-                        this.footerColorClass = 'text-orange-600 dark:text-orange-400';
-                    }
                 } else if (this.protectionType === 1) {
                     // Mode 1: URL Secret
                     if (!shortSecretBytes) {
@@ -117,6 +122,11 @@ export function sniptoComponent() {
                 } else if (this.protectionType === 2) {
                     // Mode 2: Password
                     this.showPasswordPrompt = true;
+                } else if (this.protectionType === 3) {
+                    // Mode 3: Snipto ID (Asymmetric)
+                    this.senderPublicKey = data.sender_public_key;
+                    this.keyProviderType = data.key_provider_type;
+                    this.showSniptoIdPrompt = true;
                 }
             } catch {
                 this.errorMessage = this.t('An error occurred. Please try again.');
@@ -173,15 +183,9 @@ export function sniptoComponent() {
                 this.showPayload = true;
                 this.showPasswordPrompt = false;
 
-                this.$nextTick(() => {
-                    this.renderPayload(decryptedBytes);
-                    decryptedBytes.fill(0);
-                });
-
-                if (data.views_remaining !== null && data.views_remaining > 0) {
-                    this.sniptoDisplayFooter = this.t('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.', { ':count': data.views_remaining });
-                    this.footerColorClass = 'text-orange-600 dark:text-orange-400';
-                }
+                await this.$nextTick();
+                this.renderPayload(decryptedBytes);
+                decryptedBytes.fill(0);
 
                 this.clearSensitiveRetrieval();
             } catch (err) {
@@ -395,6 +399,9 @@ export function sniptoComponent() {
 
             let payloadToSend, nonceHex, secretHash, shortSecretStr;
 
+            let senderPublicKey = null;
+            let keyProviderType = null;
+
             // Encryption Logic based on Mode
             if (finalProtectionType === 1 || finalProtectionType === 2) {
                 // E2EE Mode (Secret or Password)
@@ -422,6 +429,50 @@ export function sniptoComponent() {
                 // Clean up sensitive bytes
                 userInputBytes.fill(0);
                 secretBytes.fill(0);
+            } else if (finalProtectionType === 3) {
+                // E2EE Mode (Snipto ID / Asymmetric)
+                if (!this.sniptoIdInput.trim()) {
+                    this.showToastMessage(this.t('Please enter a Snipto ID.'));
+                    this.loading = false;
+                    return;
+                }
+
+                if (!/^[A-Za-z0-9+/]{43}=$/.test(this.sniptoIdInput.trim())) {
+                    this.showToastMessage(this.t('Invalid Snipto ID format.'));
+                    this.loading = false;
+                    return;
+                }
+
+                // Generate ephemeral X25519 key pair
+                const ephemeralPair = await crypto.subtle.generateKey(
+                    { name: 'X25519' }, true, ['deriveKey', 'deriveBits']
+                );
+
+                // Export ephemeral public key as standard base64
+                const ephPubJwk = await crypto.subtle.exportKey('jwk', ephemeralPair.publicKey);
+                senderPublicKey = ephPubJwk.x.replace(/-/g, '+').replace(/_/g, '/') + '=';
+
+                // Derive shared secret via ECDH(ephemeralPrivate, recipientPublic)
+                const { encKey, hmacKey, sharedBytes } = await this.deriveKeysFromECDH(
+                    ephemeralPair.privateKey, this.sniptoIdInput, senderPublicKey
+                );
+
+                nonceHex = await this.generateRandomBytes(12);
+                this.nonce = this.hexToBytes(nonceHex);
+                this.key = encKey;
+                this.hmacKey = hmacKey;
+
+                const userInputBytes = new TextEncoder().encode(this.userInput);
+                payloadToSend = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
+
+                // key_hash = SHA-256 of the ECDH shared secret (not the public key)
+                secretHash = await this.sha256Hex(sharedBytes);
+                sharedBytes.fill(0);
+
+                keyProviderType = 'passphrase';
+                shortSecretStr = null;
+
+                userInputBytes.fill(0);
             } else {
                 // Plaintext mode
                 payloadToSend = this.userInput;
@@ -432,6 +483,7 @@ export function sniptoComponent() {
 
             this.userInput = '';
             this.protectionPassword = '';
+            this.sniptoIdInput = '';
 
             try {
                 const res = await fetch('/api/snipto', {
@@ -447,7 +499,11 @@ export function sniptoComponent() {
                         nonce: nonceHex,
                         key_hash: secretHash,
                         protection_type: finalProtectionType,
-                        expiration: this.expirationValue
+                        expiration: this.expirationValue,
+                        ...(finalProtectionType === 3 ? {
+                            sender_public_key: senderPublicKey,
+                            key_provider_type: keyProviderType,
+                        } : {}),
                     }),
                     credentials: 'same-origin'
                 });
@@ -483,6 +539,164 @@ export function sniptoComponent() {
             }
         },
 
+        // SYNC: deriveX25519KeyPair is also in sniptoid.js — keep both in sync
+        async deriveX25519KeyPair(passphrase) {
+            const enc = new TextEncoder();
+            const salt = enc.encode('snipto-identity-v1');
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveBits']
+            );
+            const rawPrivateBytes = new Uint8Array(
+                await crypto.subtle.deriveBits(
+                    { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
+                    keyMaterial, 256
+                )
+            );
+
+            // PKCS8 wrapper for X25519: fixed 16-byte ASN.1 header + 32-byte private key
+            const pkcs8Header = new Uint8Array([
+                0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06,
+                0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20
+            ]);
+            const pkcs8 = new Uint8Array(48);
+            pkcs8.set(pkcs8Header);
+            pkcs8.set(rawPrivateBytes, 16);
+
+            const privateKey = await crypto.subtle.importKey(
+                'pkcs8', pkcs8, { name: 'X25519' }, true, ['deriveBits']
+            );
+
+            // Export to JWK to obtain the public key
+            const jwk = await crypto.subtle.exportKey('jwk', privateKey);
+            const publicKeyBase64 = jwk.x.replace(/-/g, '+').replace(/_/g, '/') + '=';
+
+            // Re-import as non-extractable for ECDH operations
+            const privateKeyForUse = await crypto.subtle.importKey(
+                'pkcs8', pkcs8, { name: 'X25519' }, false, ['deriveBits']
+            );
+
+            // Clean up sensitive material
+            rawPrivateBytes.fill(0);
+            pkcs8.fill(0);
+
+            return { privateKey: privateKeyForUse, publicKeyBase64 };
+        },
+
+        concatBytes(...arrays) {
+            const total = arrays.reduce((sum, a) => sum + a.length, 0);
+            const result = new Uint8Array(total);
+            let offset = 0;
+            for (const a of arrays) {
+                result.set(a, offset);
+                offset += a.length;
+            }
+            return result;
+        },
+
+        async deriveKeysFromECDH(privateKey, theirPublicKeyBase64, myPublicKeyBase64) {
+            const pubKeyBytes = this.base64ToBytes(theirPublicKeyBase64);
+            const theirPublicKey = await crypto.subtle.importKey(
+                'raw', pubKeyBytes, { name: 'X25519' }, false, []
+            );
+
+            const sharedBits = await crypto.subtle.deriveBits(
+                { name: 'X25519', public: theirPublicKey }, privateKey, 256
+            );
+            const sharedBytes = new Uint8Array(sharedBits);
+
+            // Use HKDF (not PBKDF2) — ECDH output already has full entropy
+            const hkdfKey = await crypto.subtle.importKey(
+                'raw', sharedBits, 'HKDF', false, ['deriveKey']
+            );
+
+            const enc = new TextEncoder();
+            const hkdfSalt = enc.encode('snipto-enc-v1');
+
+            // Identity-bind both public keys into HKDF info for key-substitution resistance
+            const sorted = [myPublicKeyBase64, theirPublicKeyBase64].sort();
+            const pubKeyContext = this.concatBytes(this.base64ToBytes(sorted[0]), this.base64ToBytes(sorted[1]));
+
+            const encKey = await crypto.subtle.deriveKey(
+                { name: 'HKDF', hash: 'SHA-256', salt: hkdfSalt, info: this.concatBytes(enc.encode('aes-key'), pubKeyContext) },
+                hkdfKey,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+
+            const hmacKey = await crypto.subtle.deriveKey(
+                { name: 'HKDF', hash: 'SHA-256', salt: hkdfSalt, info: this.concatBytes(enc.encode('hmac-key'), pubKeyContext) },
+                hkdfKey,
+                { name: 'HMAC', hash: 'SHA-256', length: 256 },
+                false,
+                ['sign', 'verify']
+            );
+
+            return { encKey, hmacKey, sharedBytes };
+        },
+
+        async unlockWithSniptoId() {
+            if (!this.sniptoIdPassphrase.trim()) return;
+
+            if (this.sniptoIdPassphrase.length < 16) {
+                this.showToastMessage(this.t('Passphrase must be at least 16 characters.'));
+                return;
+            }
+
+            this.loading = true;
+
+            try {
+                const { privateKey, publicKeyBase64 } = await this.deriveX25519KeyPair(this.sniptoIdPassphrase);
+
+                // Compute ECDH shared secret with sender's ephemeral public key (available from init())
+                const { encKey, hmacKey, sharedBytes } = await this.deriveKeysFromECDH(
+                    privateKey, this.senderPublicKey, publicKeyBase64
+                );
+
+                // key_hash = SHA-256 of the ECDH shared secret (not the public key)
+                const keyHash = await this.sha256Hex(sharedBytes);
+                sharedBytes.fill(0);
+
+                const res = await fetch(`/api/snipto/${this.slug}?key_hash=${keyHash}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (res.status === 403) {
+                    this.showToastMessage(this.t('This Snipto was not sent to your Snipto ID. Check your passphrase.'));
+                    return;
+                }
+
+                if (res.status === 429) {
+                    this.handleThrottling(res);
+                    return;
+                }
+
+                if (!res.ok) throw new Error();
+
+                const data = await res.json();
+
+                const nonce = this.hexToBytes(data.nonce);
+                const payloadBytes = this.base64ToBytes(data.payload);
+                const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, nonce, hmacKey, data.nonce);
+                const decryptedBytes = new Uint8Array(decryptedBuffer);
+
+                this.showPayload = true;
+                this.showSniptoIdPrompt = false;
+
+                await this.$nextTick();
+                this.renderPayload(decryptedBytes);
+                decryptedBytes.fill(0);
+
+                this.clearSensitiveRetrieval();
+            } catch (err) {
+                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
+            } finally {
+                this.sniptoIdPassphrase = '';
+                this.loading = false;
+            }
+        },
+
         clearSensitiveCreation() {
             this.key = null;
             this.hmacKey = null;
@@ -494,13 +708,18 @@ export function sniptoComponent() {
 
         generateShortSecret(length) {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            const limit = 256 - (256 % chars.length); // 248 — reject bytes >= limit to eliminate modulo bias
             let result = '';
-            const array = new Uint8Array(length);
-            window.crypto.getRandomValues(array);
-            for (let i = 0; i < length; i++) {
-                result += chars[array[i] % chars.length];
+            while (result.length < length) {
+                const array = new Uint8Array(length * 2);
+                window.crypto.getRandomValues(array);
+                for (let i = 0; i < array.length && result.length < length; i++) {
+                    if (array[i] < limit) {
+                        result += chars[array[i] % chars.length];
+                    }
+                }
+                array.fill(0);
             }
-            array.fill(0); // Clear random bytes
             return result;
         },
 

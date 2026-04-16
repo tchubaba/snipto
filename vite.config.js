@@ -30,6 +30,10 @@ export default defineConfig({
                     src: 'resources/js/snipto.js',
                     dest: 'js',
                 },
+                {
+                    src: 'resources/js/sniptoid.js',
+                    dest: 'js',
+                },
             ],
         }),
     ],
