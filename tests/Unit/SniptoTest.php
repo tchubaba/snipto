@@ -85,10 +85,12 @@ class SniptoTest extends TestCase
         $plaintext = new Snipto(['protection_type' => ProtectionType::Plaintext]);
         $secret    = new Snipto(['protection_type' => ProtectionType::Secret]);
         $password  = new Snipto(['protection_type' => ProtectionType::Password]);
+        $sniptoId  = new Snipto(['protection_type' => ProtectionType::SniptoId]);
 
         $this->assertFalse($plaintext->isEncrypted());
         $this->assertTrue($secret->isEncrypted());
         $this->assertTrue($password->isEncrypted());
+        $this->assertTrue($sniptoId->isEncrypted());
     }
 
     #[Test]
@@ -101,5 +103,26 @@ class SniptoTest extends TestCase
         $this->assertFalse($plaintext->isPasswordProtected());
         $this->assertFalse($secret->isPasswordProtected());
         $this->assertTrue($password->isPasswordProtected());
+    }
+
+    #[Test]
+    public function it_knows_if_it_is_snipto_id()
+    {
+        $plaintext = new Snipto(['protection_type' => ProtectionType::Plaintext]);
+        $secret    = new Snipto(['protection_type' => ProtectionType::Secret]);
+        $password  = new Snipto(['protection_type' => ProtectionType::Password]);
+        $sniptoId  = new Snipto(['protection_type' => ProtectionType::SniptoId]);
+
+        $this->assertFalse($plaintext->isSniptoId());
+        $this->assertFalse($secret->isSniptoId());
+        $this->assertFalse($password->isSniptoId());
+        $this->assertTrue($sniptoId->isSniptoId());
+    }
+
+    #[Test]
+    public function snipto_id_type_is_encrypted()
+    {
+        $sniptoId = new Snipto(['protection_type' => ProtectionType::SniptoId]);
+        $this->assertTrue($sniptoId->isEncrypted());
     }
 }

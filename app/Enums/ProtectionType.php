@@ -12,4 +12,5 @@ enum ProtectionType: int
     case Plaintext = 0;
     case Secret    = 1;
     case Password  = 2;
+    case SniptoId  = 3;
 }

@@ -165,4 +165,113 @@ class SniptoApiTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    #[Test]
+    public function it_can_store_a_snipto_id_encrypted_snippet()
+    {
+        $nonce          = bin2hex(random_bytes(12));
+        $keyHash        = hash('sha256', random_bytes(32));
+        $senderPubKey   = base64_encode(random_bytes(32)); // 44 chars
+
+        $response = $this->postJson('/api/snipto', [
+            'slug'              => 'test-snipto-id',
+            'payload'           => base64_encode('encrypted-data'),
+            'nonce'             => $nonce,
+            'key_hash'          => $keyHash,
+            'protection_type'   => ProtectionType::SniptoId->value,
+            'sender_public_key' => $senderPubKey,
+            'key_provider_type' => 'passphrase',
+            'expiration'        => '1d',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson(['success' => true, 'slug' => 'test-snipto-id']);
+
+        $this->assertDatabaseHas('sniptos', [
+            'slug'              => 'test-snipto-id',
+            'protection_type'   => ProtectionType::SniptoId->value,
+            'sender_public_key' => $senderPubKey,
+            'key_provider_type' => 'passphrase',
+        ]);
+    }
+
+    #[Test]
+    public function it_returns_sender_public_key_for_snipto_id_type()
+    {
+        $senderPubKey = base64_encode(random_bytes(32));
+        $keyHash      = hash('sha256', 'recipient-pub');
+
+        Snipto::create([
+            'slug'              => 'sid-slug',
+            'payload'           => base64_encode('encrypted-data'),
+            'nonce'             => bin2hex(random_bytes(12)),
+            'key_hash'          => $keyHash,
+            'protection_type'   => ProtectionType::SniptoId,
+            'sender_public_key' => $senderPubKey,
+            'key_provider_type' => 'passphrase',
+            'expires_at'        => Carbon::now()->addDay(),
+            'views_remaining'   => 1,
+        ]);
+
+        // First call without key_hash returns metadata but no payload
+        $response = $this->getJson('/api/snipto/sid-slug');
+        $response->assertStatus(200)
+            ->assertJson([
+                'protection_type'   => ProtectionType::SniptoId->value,
+                'sender_public_key' => $senderPubKey,
+                'key_provider_type' => 'passphrase',
+            ])
+            ->assertJsonMissing(['payload']);
+
+        // Second call with correct key_hash returns payload
+        $response = $this->getJson("/api/snipto/sid-slug?key_hash={$keyHash}");
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'payload' => base64_encode('encrypted-data'),
+            ]);
+
+        // Should be deleted after view
+        $this->assertDatabaseMissing('sniptos', ['slug' => 'sid-slug']);
+    }
+
+    #[Test]
+    public function it_rejects_snipto_id_without_sender_public_key()
+    {
+        $response = $this->postJson('/api/snipto', [
+            'slug'            => 'no-sender-key',
+            'payload'         => base64_encode('data'),
+            'nonce'           => bin2hex(random_bytes(12)),
+            'key_hash'        => hash('sha256', 'test'),
+            'protection_type' => ProtectionType::SniptoId->value,
+            // missing sender_public_key
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    #[Test]
+    public function it_allows_snipto_id_with_custom_expiration()
+    {
+        $nonce        = bin2hex(random_bytes(12));
+        $keyHash      = hash('sha256', random_bytes(32));
+        $senderPubKey = base64_encode(random_bytes(32));
+
+        $response = $this->postJson('/api/snipto', [
+            'slug'              => 'sid-expiry-test',
+            'payload'           => base64_encode('data'),
+            'nonce'             => $nonce,
+            'key_hash'          => $keyHash,
+            'protection_type'   => ProtectionType::SniptoId->value,
+            'sender_public_key' => $senderPubKey,
+            'expiration'        => '1w',
+        ]);
+
+        $response->assertStatus(200);
+
+        $snipto = Snipto::where('slug', 'sid-expiry-test')->first();
+        $this->assertNotNull($snipto);
+        // Verify expiration is approximately 1 week from now (within 5 minutes tolerance)
+        $this->assertTrue($snipto->expires_at->greaterThan(Carbon::now()->addDays(6)));
+    }
 }

@@ -55,12 +55,16 @@
                         {!! __('The key is included in the URL after the <code>#</code> symbol. This part of the URL is <strong>never sent to our servers</strong>.') !!}
                     </li>
                     <li>
-                        <strong>{!! __('Password Protected:') !!}</strong> 
+                        <strong>{!! __('Password Protected:') !!}</strong>
                         {!! __('The key is the password you provide. We only store a hash of your password for verification — the actual password <strong>never leaves your browser</strong>.') !!}
+                    </li>
+                    <li>
+                        <strong>{!! __('Snipto ID (Asymmetric):') !!}</strong>
+                        {!! __('The sender encrypts using the recipient\'s public Snipto ID. Only the recipient can decrypt by re-deriving their private key from their passphrase. The private key <strong>never leaves the browser</strong>.') !!}
                     </li>
                 </ul>
                 <p class="mt-4">
-                    {!! __('In both cases, only someone with the correct key (the link fragment or the password) can decrypt the Snipto.') !!}
+                    {!! __('In all cases, only someone with the correct key can decrypt the Snipto.') !!}
                 </p>
             </div>
 
@@ -74,7 +78,7 @@
             <div id="never-viewed" class="scroll-mt-13">
                 <h2 class="text-xl font-semibold mb-3 text-indigo-600 dark:text-indigo-400">{!! __('What happens if my snipto is never viewed?') !!}</h2>
                 <p>
-                    {!! __('If a snipto is never opened, it will be automatically deleted when it reaches its expiration time. By default, this happens one hour after creation. However, password-protected snippets can be configured to last for up to one week. Sniptos are meant to be temporary, and shorter time-to-live settings help keep your data more secure.') !!}
+                    {!! __('If a snipto is never opened, it will be automatically deleted when it reaches its expiration time. By default, this happens one hour after creation. However, password-protected and Snipto ID snippets can be configured to last for up to one week. Sniptos are meant to be temporary, and shorter time-to-live settings help keep your data more secure.') !!}
                 </p>
             </div>
 

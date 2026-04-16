@@ -67,7 +67,7 @@ class ApiController extends Controller
             ]);
         }
 
-        if ( ! empty($keyHash) && $snipto->key_hash !== $keyHash) {
+        if ( ! empty($keyHash) && ! hash_equals($snipto->key_hash, $keyHash)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Key Hash invalid.',
@@ -80,6 +80,11 @@ class ApiController extends Controller
             'exists'          => true,
             'protection_type' => $snipto->protection_type->value,
         ];
+
+        if ($snipto->isSniptoId()) {
+            $response['sender_public_key'] = $snipto->sender_public_key;
+            $response['key_provider_type'] = $snipto->key_provider_type;
+        }
 
         // If the key hash is present and valid, add the payload, decrement views and include view_remaining.
         if ( ! empty($keyHash)) {
@@ -131,6 +136,11 @@ class ApiController extends Controller
             ];
             $rules['key_hash'] = 'required|string|size:64|regex:/^[0-9a-fA-F]+$/';
             $rules['nonce']    = 'required|string|size:24|regex:/^[0-9a-fA-F]+$/';
+
+            if ($protectionType === ProtectionType::SniptoId) {
+                $rules['sender_public_key'] = ['required', 'string', 'size:44', 'regex:/^[A-Za-z0-9+\/]{43}=$/'];
+                $rules['key_provider_type'] = 'nullable|string|in:passphrase';
+            }
         } else {
             $rules['payload'] = [
                 'required',
@@ -153,7 +163,7 @@ class ApiController extends Controller
         $expiration = $request->input('expiration', '1h');
         $expiresAt  = Carbon::now()->addHour();
 
-        if ($protectionType === ProtectionType::Password) {
+        if ($protectionType === ProtectionType::Password || $protectionType === ProtectionType::SniptoId) {
             $expiresAt = match ($expiration) {
                 '1d'    => Carbon::now()->addDay(),
                 '1w'    => Carbon::now()->addWeek(),

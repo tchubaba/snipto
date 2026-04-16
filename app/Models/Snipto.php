@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $payload
  * @property string|null $key_hash
  * @property string|null $nonce
+ * @property string|null $sender_public_key
+ * @property string|null $key_provider_type
  * @property int|null $views_remaining
  * @property ProtectionType $protection_type
  * @property Carbon $expires_at
@@ -46,19 +48,23 @@ class Snipto extends Model
         'payload',
         'key_hash',
         'nonce',
+        'sender_public_key',
+        'key_provider_type',
         'views_remaining',
         'protection_type',
         'expires_at',
     ];
 
     protected $casts = [
-        'slug'            => 'string',
-        'payload'         => 'string',
-        'key_hash'        => 'string',
-        'nonce'           => 'string',
-        'views_remaining' => 'integer',
-        'protection_type' => ProtectionType::class,
-        'expires_at'      => 'datetime',
+        'slug'              => 'string',
+        'payload'           => 'string',
+        'key_hash'          => 'string',
+        'nonce'             => 'string',
+        'sender_public_key' => 'string',
+        'key_provider_type' => 'string',
+        'views_remaining'   => 'integer',
+        'protection_type'   => ProtectionType::class,
+        'expires_at'        => 'datetime',
     ];
 
     /**
@@ -102,5 +108,13 @@ class Snipto extends Model
     public function isPasswordProtected(): bool
     {
         return $this->protection_type === ProtectionType::Password;
+    }
+
+    /**
+     * Indicates whether the Snipto uses Snipto ID (asymmetric) encryption.
+     */
+    public function isSniptoId(): bool
+    {
+        return $this->protection_type === ProtectionType::SniptoId;
     }
 }
