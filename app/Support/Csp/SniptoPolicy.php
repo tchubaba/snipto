@@ -13,9 +13,7 @@ class SniptoPolicy extends Basic
      * Configures the given policy with predefined security directives
      * to control resource loading and enforce stricter content security.
      *
-     * @param Policy $policy The policy instance to be configured.
-     *
-     * @return void
+     * @param  Policy  $policy  The policy instance to be configured.
      */
     public function configure(Policy $policy): void
     {

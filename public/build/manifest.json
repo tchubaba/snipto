@@ -20,15 +20,16 @@
     "src": "node_modules/flag-icons/flags/4x3/us.svg"
   },
   "resources/css/app.css": {
-    "file": "assets/app-tuq3u08P.css",
+    "file": "assets/app-CFID2yp-.css",
     "src": "resources/css/app.css",
     "isEntry": true,
+    "name": "app",
     "names": [
       "app.css"
     ]
   },
   "resources/js/app.js": {
-    "file": "js/app-CLFDbUBK.js",
+    "file": "js/app-3n7ePyoW.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true

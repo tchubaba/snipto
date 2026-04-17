@@ -21,10 +21,9 @@ class CspReportController extends Controller
      * response is returned. Valid CSP violations are logged using a
      * specific log channel.
      *
-     * @param Request $request The HTTP request instance containing the CSP report payload.
-     *
+     * @param  Request  $request  The HTTP request instance containing the CSP report payload.
      * @return Response|JsonResponse Returns a no-content response for successful processing
-     *                                or a JSON response containing error details if validation fails.
+     *                               or a JSON response containing error details if validation fails.
      */
     public function report(Request $request): Response|JsonResponse
     {
@@ -43,7 +42,7 @@ class CspReportController extends Controller
             'csp-report.blocked-uri'         => ['required', 'string'],
             'csp-report.column-number'       => ['nullable', 'integer', 'min:0'],
             'csp-report.disposition'         => ['string', 'in:enforce,report'],
-            'csp-report.document-uri'        => ['required', 'url', 'starts_with:' . config('app.url')],
+            'csp-report.document-uri'        => ['required', 'url', 'starts_with:'.config('app.url')],
             'csp-report.effective-directive' => ['required', 'string'],
             'csp-report.line-number'         => ['nullable', 'integer', 'min:0'],
             'csp-report.original-policy'     => ['required', 'string'],
@@ -56,11 +55,13 @@ class CspReportController extends Controller
         // Check for validation errors
         if ($validator->fails()) {
             Log::channel('csp')->error('Invalid CSP report', $validator->errors()->all());
+
             return response()->json(['error' => 'Invalid CSP report'], 400);
         }
 
         // Log valid report
         Log::channel('csp')->warning('CSP Violation', $payload['csp-report']);
+
         return response()->noContent();
     }
 }

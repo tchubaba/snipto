@@ -94,6 +94,53 @@ Snipto employs a multi-layered defense-in-depth strategy to protect user data an
 
 ---
 
+## Development & Deployment
+
+Snipto is Dockerized for both production and development environments. By default, the application deploys in **production mode**.
+
+### Environment Modes
+
+The deployment mode is controlled by the `APP_ENV` environment variable:
+
+- **Production (Default):** Optimizes the application for performance. It runs `composer install --no-dev`, caches configurations and routes, and builds production assets with Vite.
+- **Development:** Set `APP_ENV=local` to enable development features. This mode installs dev-dependencies, generates IDE helper files, and starts the Vite development server with hot-module replacement.
+
+To switch to development mode:
+1. Update your `.env` or set the environment variable: `APP_ENV=local`.
+2. Rebuild and start the containers: `make build && make up`.
+
+### External Database
+
+By default, Snipto starts a MariaDB container. To use an external database instead:
+
+1. Open `config.mk` and remove `with-db` from the `COMPOSE_PROFILES` variable.
+2. Update your `.env` file with your external database credentials (`DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`).
+3. Run `make up`.
+
+The application will automatically wait for your external database to be accessible before running migrations.
+
+### Makefile Shortcuts
+
+A `Makefile` is provided to simplify common tasks:
+
+| Command | Description |
+| :--- | :--- |
+| `make up` | Start the containers in the background. |
+| `make down` | Stop and remove the containers. |
+| `make build` | Rebuild the Docker images. |
+| `make restart` | Restart all services. |
+| `make artisan cmd="..."` | Run an Artisan command (e.g., `make artisan migrate`). |
+| `make composer cmd="..."`| Run a Composer command. |
+| `make npm cmd="..."` | Run an NPM command. |
+| `make shell` | Open a bash shell inside the `app` container. |
+| `make test` | Run the PHPUnit test suite. |
+| `make grumphp` | Run GrumPHP quality checks. |
+| `make fix` | Automatically fix code style issues using Laravel Pint. |
+| `make logs` | Tail the application logs. |
+| `make fresh` | Reset the database and run migrations with seeders. |
+
+---
+
 ## License
 This project is licensed under the [MIT License](LICENSE).
 

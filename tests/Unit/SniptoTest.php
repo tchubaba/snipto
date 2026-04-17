@@ -2,12 +2,12 @@
 
 namespace Tests\Unit;
 
-use App\Models\Snipto;
 use App\Enums\ProtectionType;
+use App\Models\Snipto;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class SniptoTest extends TestCase
 {

@@ -50,11 +50,11 @@
 
         <div class="flex items-center space-x-4">
             <!-- Get Snipto ID Link -->
-            <a href="{{ route('sniptoid') }}" class="hidden sm:flex items-center space-x-2 px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors duration-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <a href="{{ route('sniptoid') }}" class="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
-                <span>{{ __('Get your Snipto ID') }}</span>
+                <span class="hidden sm:inline">{{ __('Get your Snipto ID') }}</span>
             </a>
 
             <!-- Language Dropdown -->
@@ -111,8 +111,8 @@
 <!-- Footer -->
 <footer class="fixed bottom-0 left-0 w-full border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 z-10">
     <div class="max-w-6xl mx-auto px-4 py-4 flex justify-center space-x-6 text-sm text-gray-600 dark:text-gray-400">
-        <a href="/faq" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('FAQ') }}</a>
         <a href="{{ route('sniptoid') }}" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Snipto ID') }}</a>
+        <a href="/faq" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('FAQ') }}</a>
         <a href="/safety" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Safety') }}</a>
         <a href="/terms" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Terms') }}</a>
         <a href="/contact" class="hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('Contact') }}</a>

@@ -34,7 +34,6 @@ use Illuminate\Database\Eloquent\Model;
  * @method static Builder|Snipto whereExpiresAt($value)
  * @method static Builder|Snipto whereCreatedAt($value)
  * @method static Builder|Snipto whereUpdatedAt($value)
- *
  * @method static Snipto create(array $attributes = [])
  *
  * @mixin Eloquent

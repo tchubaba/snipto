@@ -30,8 +30,7 @@ class ApiController extends Controller
      * - If the record exists but has expired, deletes the record and returns a 410 response indicating the expiration.
      * - If the record exists and is not expired, returns its details including payload, IV, remaining views, and expiration timestamp.
      *
-     * @param string $slug The unique identifier for retrieving the Snipto resource.
-     *
+     * @param  string  $slug  The unique identifier for retrieving the Snipto resource.
      * @return JsonResponse A structured JSON response containing the requested data or an error message.
      */
     public function show(string $slug, Request $request): JsonResponse
@@ -50,6 +49,7 @@ class ApiController extends Controller
 
         if ($snipto->isExpired()) {
             $snipto->delete();
+
             return response()->json([
                 'success' => false,
                 'exists'  => false,
@@ -110,14 +110,14 @@ class ApiController extends Controller
      * - 'views_remaining': Optional, integer, minimum value of 1.
      * - 'expires_at': Required, date, must be a future date.
      *
-     * @param Request $request The incoming HTTP request containing the data to store.
-     *
+     * @param  Request  $request  The incoming HTTP request containing the data to store.
      * @return JsonResponse A JSON response containing the success status.
+     *
      * @throws ValidationException
      */
     public function store(Request $request): JsonResponse
     {
-        $protectionType = ProtectionType::tryFrom((int)$request->input('protection_type'));
+        $protectionType = ProtectionType::tryFrom((int) $request->input('protection_type'));
 
         $rules = [
             'slug'            => 'required|string|max:100|unique:sniptos,slug',
@@ -155,7 +155,7 @@ class ApiController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-//                'errors'  => $validator->errors(), // Not an API for public consumption, so no need to include errors.
+                //                'errors'  => $validator->errors(), // Not an API for public consumption, so no need to include errors.
             ], 422);
         }
 

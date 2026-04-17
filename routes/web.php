@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ApiController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -22,16 +23,13 @@ Route::view('/sniptoid', 'sniptoid')->name('sniptoid');
 // Create a new snippet (AJAX POST)
 Route::prefix('api/snipto')->group(function () {
     Route::post('/', [ApiController::class, 'store'])
-        ->middleware('throttle:10,1');
+        ->middleware('progressive.throttle:store-snipto');
     Route::get('{slug}', [ApiController::class, 'show'])
         ->where('slug', '[A-Za-z0-9_-]+')
-        ->middleware('throttle:6,1');
-    Route::post('{slug}/viewed', [ApiController::class, 'markViewed'])
-        ->where('slug', '[A-Za-z0-9_-]+')
-        ->middleware('throttle:6,1');
+        ->middleware('progressive.throttle:show-snipto');
 });
 
-Route::post('/locale', function (\Illuminate\Http\Request $request) {
+Route::post('/locale', function (Request $request) {
     $locale = $request->input('locale');
 
     // Get all supported locale keys from config

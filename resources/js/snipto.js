@@ -29,6 +29,7 @@ export function sniptoComponent() {
         contentHostId: null,
         calledInit: false,
         isThrottled: false,
+        isLockedOut: false,
         throttleCountdown: 0,
         throttleInterval: null,
         lineWidths: null, // To store line widths for resize without sensitive data
@@ -96,7 +97,7 @@ export function sniptoComponent() {
                     this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
                     return;
                 } else if (res.status === 429) {
-                    this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
+                    this.handleThrottling(res, true);
                     return;
                 } else if (!res.ok) {
                     throw new Error();
@@ -166,7 +167,7 @@ export function sniptoComponent() {
                 }
 
                 if (res.status === 429) {
-                    this.handleThrottling(res);
+                    this.handleThrottling(res, true);
                     return;
                 }
 
@@ -509,7 +510,7 @@ export function sniptoComponent() {
                 });
 
                 if (res.status === 429) {
-                    this.errorMessage = this.t('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.');
+                    this.handleThrottling(res);
                     return;
                 }
 
@@ -663,12 +664,12 @@ export function sniptoComponent() {
                 });
 
                 if (res.status === 403) {
-                    this.showToastMessage(this.t('This Snipto was not sent to your Snipto ID. Check your passphrase.'));
+                    this.showToastMessage(this.t('Decryption failed. Please check your passphrase and try again.'));
                     return;
                 }
 
                 if (res.status === 429) {
-                    this.handleThrottling(res);
+                    this.handleThrottling(res, true);
                     return;
                 }
 
@@ -908,7 +909,18 @@ export function sniptoComponent() {
             setTimeout(() => this.showToast = false, 3000);
         },
 
-        handleThrottling(res) {
+        handleThrottling(res, reloadOnExpiry = false) {
+            if (res.headers.get('X-RateLimit-Lockout') === '1') {
+                this.isLockedOut = true;
+                this.isThrottled = false;
+                this.loading = false;
+                if (this.throttleInterval) {
+                    clearInterval(this.throttleInterval);
+                    this.throttleInterval = null;
+                }
+                return;
+            }
+
             const resetTimestamp = parseInt(res.headers.get('X-RateLimit-Reset'));
             if (!resetTimestamp) return;
 
@@ -928,6 +940,7 @@ export function sniptoComponent() {
                     clearInterval(this.throttleInterval);
                     this.isThrottled = false;
                     this.throttleInterval = null;
+                    if (reloadOnExpiry) window.location.reload();
                 }
             }, 1000);
         },

@@ -3,11 +3,24 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\App;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class LocalizationTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'app.supported_locales' => [
+                'en' => ['name' => 'English', 'flag' => 'us'],
+                'fr' => ['name' => 'Français', 'flag' => 'fr'],
+                'es' => ['name' => 'Español', 'flag' => 'es'],
+            ],
+        ]);
+    }
+
     #[Test]
     public function it_defaults_to_english_locale()
     {

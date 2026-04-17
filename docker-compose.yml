@@ -6,14 +6,23 @@ services:
             args:
                 user: snipto
                 uid: 1000
+                INSTALL_XDEBUG: "false"
         image: snipto/app
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
-            - '${APP_PORT:-8080}:80'
+            - '${APP_PORT:-8080}:${APP_PORT:-8080}'
             - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
         environment:
             LARAVEL_SAIL: 1
+            APP_ENV: '${APP_ENV:-production}'
+            APP_PORT: '${APP_PORT:-8080}'
+            DB_CONNECTION: '${DB_CONNECTION:-mysql}'
+            DB_HOST: '${DB_HOST:-mariadb}'
+            DB_PORT: '${DB_PORT:-3306}'
+            DB_DATABASE: '${DB_DATABASE:-snipto}'
+            DB_USERNAME: '${DB_USERNAME:-snipto}'
+            DB_PASSWORD: '${DB_PASSWORD:-secret}'
             XDEBUG_MODE: 'debug,develop'
             XDEBUG_CONFIG: 'client_host=host.docker.internal client_port=9003 start_with_request=yes'
             PHP_IDE_CONFIG: 'serverName=Snipto'
@@ -21,37 +30,17 @@ services:
             - '.:/var/www/html'
         networks:
             - sail
-        depends_on:
-            mariadb:
-                condition: service_healthy
-        command: >
-            bash -c "
-                if [ ! -f .env ]; then cp .env.example .env; fi &&
-                sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env &&
-                sed -i 's/.*DB_HOST=.*/DB_HOST=mariadb/' .env &&
-                sed -i 's/.*DB_PORT=.*/DB_PORT=3306/' .env &&
-                sed -i 's/.*DB_DATABASE=.*/DB_DATABASE=snipto/' .env &&
-                sed -i 's/.*DB_USERNAME=.*/DB_USERNAME=snipto/' .env &&
-                sed -i 's/.*DB_PASSWORD=.*/DB_PASSWORD=secret/' .env &&
-                composer install --no-interaction &&
-                if ! grep -q \"APP_KEY=base64\" .env; then php artisan key:generate; fi &&
-                npm install &&
-                until php artisan migrate --force; do echo 'Waiting for database migration...' && sleep 1; done &&
-                (php ./vendor/bin/grumphp git:init || true) &&
-                (php artisan queue:listen --tries=1 &) &&
-                (npm run dev &) &&
-                php artisan serve --host=0.0.0.0 --port=80
-            "
     mariadb:
         image: 'mariadb:11'
+        profiles: ["with-db"]
         ports:
             - '${FORWARD_DB_PORT:-3306}:3306'
         environment:
-            MYSQL_ROOT_PASSWORD: 'secret'
+            MYSQL_ROOT_PASSWORD: '${DB_PASSWORD:-secret}'
             MYSQL_ROOT_HOST: '%'
-            MYSQL_DATABASE: 'snipto'
-            MYSQL_USER: 'snipto'
-            MYSQL_PASSWORD: 'secret'
+            MYSQL_DATABASE: '${DB_DATABASE:-snipto}'
+            MYSQL_USER: '${DB_USERNAME:-snipto}'
+            MYSQL_PASSWORD: '${DB_PASSWORD:-secret}'
             MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
         volumes:
             - 'sail-mariadb:/var/lib/mysql'

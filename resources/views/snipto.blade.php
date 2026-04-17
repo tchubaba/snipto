@@ -41,9 +41,10 @@
                 'This snippet was sent to a Snipto ID.' => __('This snippet was sent to a Snipto ID.'),
                 'Enter your passphrase to generate your Snipto ID and decrypt.' => __('Enter your passphrase to generate your Snipto ID and decrypt.'),
                 'Decrypt' => __('Decrypt'),
-                'This Snipto was not sent to your Snipto ID. Check your passphrase.' => __('This Snipto was not sent to your Snipto ID. Check your passphrase.'),
+                'Decryption failed. Please check your passphrase and try again.' => __('Decryption failed. Please check your passphrase and try again.'),
                 'Passphrase must be at least 16 characters.' => __('Passphrase must be at least 16 characters.'),
-                'Your browser does not support this feature. Please update your browser.' => __('Your browser does not support this feature. Please update your browser.')
+                'Your browser does not support this feature. Please update your browser.' => __('Your browser does not support this feature. Please update your browser.'),
+                'You have been temporarily locked out. Please check back later.' => __('You have been temporarily locked out. Please check back later.')
             ]);
         @endphp
     </script>
@@ -83,6 +84,19 @@
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
              class="space-y-4">
+
+            <!-- Lockout Notice -->
+            <div x-show="isLockedOut" x-cloak x-transition.opacity
+                 class="text-sm text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full">
+                <span x-text="t('You have been temporarily locked out. Please check back later.')"></span>
+            </div>
+
+            <!-- Throttle Countdown (top-level: metadata-fetch throttle, outside of form/prompt contexts) -->
+            <div x-show="isThrottled && !showPasswordPrompt && !showSniptoIdPrompt && !showForm" x-cloak x-transition.opacity
+                 class="text-xs text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800 w-full">
+                <span x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
+            </div>
+
             <!-- Display payload -->
             <div x-show="showPayload" x-cloak
                  class="space-y-4 transform transition-transform duration-300 hover:scale-[1.01]">
@@ -132,14 +146,14 @@
                         <span x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                     </div>
 
-                    <input type="password" x-model="protectionPassword" 
+                    <input type="password" x-model="protectionPassword"
                            @keydown.enter="unlockWithPassword()"
-                           :disabled="isThrottled"
+                           :disabled="isThrottled || isLockedOut"
                            placeholder="{{ __('Enter password') }}"
                            class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                     
                     <button @click="unlockWithPassword()"
-                            :disabled="isThrottled || !protectionPassword.trim()"
+                            :disabled="isThrottled || isLockedOut || !protectionPassword.trim()"
                             class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                         {!! __('Unlock') !!}
                     </button>
@@ -172,12 +186,12 @@
 
                     <input type="password" x-model="sniptoIdPassphrase"
                            @keydown.enter="unlockWithSniptoId()"
-                           :disabled="isThrottled"
+                           :disabled="isThrottled || isLockedOut"
                            placeholder="{{ __('Enter your passphrase') }}"
                            class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
 
                     <button @click="unlockWithSniptoId()"
-                            :disabled="isThrottled || !sniptoIdPassphrase.trim()"
+                            :disabled="isThrottled || isLockedOut || !sniptoIdPassphrase.trim()"
                             class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                         {!! __('Decrypt') !!}
                     </button>
@@ -342,9 +356,16 @@
                 </div>
 
                 <div class="flex flex-col items-center space-y-2">
+                    <!-- Throttling Warning (creation form) -->
+                    <div x-show="isThrottled || isLockedOut" x-cloak x-transition.opacity
+                         class="text-xs text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800 w-full">
+                        <span x-show="isThrottled" x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
+                        <span x-show="isLockedOut" x-text="t('You have been temporarily locked out. Please check back later.')"></span>
+                    </div>
                     <button @click="submitSnipto()"
+                            :disabled="isThrottled || isLockedOut"
                             class="bg-indigo-500 text-white px-6 py-2 rounded shadow hover:bg-indigo-600
-                           hover:shadow-lg transition transform duration-150 active:scale-95">
+                           hover:shadow-lg transition transform duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                         {!! __('Snipto it') !!}
                     </button>
                     <!-- Terms of Service notice -->

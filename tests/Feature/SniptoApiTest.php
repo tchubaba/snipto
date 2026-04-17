@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\Snipto;
 use App\Enums\ProtectionType;
+use App\Models\Snipto;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class SniptoApiTest extends TestCase
 {
@@ -169,9 +169,9 @@ class SniptoApiTest extends TestCase
     #[Test]
     public function it_can_store_a_snipto_id_encrypted_snippet()
     {
-        $nonce          = bin2hex(random_bytes(12));
-        $keyHash        = hash('sha256', random_bytes(32));
-        $senderPubKey   = base64_encode(random_bytes(32)); // 44 chars
+        $nonce        = bin2hex(random_bytes(12));
+        $keyHash      = hash('sha256', random_bytes(32));
+        $senderPubKey = base64_encode(random_bytes(32)); // 44 chars
 
         $response = $this->postJson('/api/snipto', [
             'slug'              => 'test-snipto-id',
