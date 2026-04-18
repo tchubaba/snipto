@@ -3,8 +3,9 @@ FROM php:8.3-fpm
 USER root
 
 # Arguments defined in docker-compose.yml
-ARG user
-ARG uid
+# Defaults provided for production/CI builds where these aren't passed
+ARG user=snipto
+ARG uid=1000
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -40,8 +41,19 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Create system user to run Composer and Artisan Commands
-RUN if getent passwd $uid; then userdel -f $(getent passwd $uid | cut -d: -f1); fi
-RUN useradd -G sudo,www-data -u $uid -d /home/$user $user
+# We use a more robust check and avoid deleting existing system users if possible
+RUN if [ "$uid" != "0" ]; then \
+    if getent passwd "$uid" > /dev/null; then \
+        existing_user=$(getent passwd "$uid" | cut -d: -f1); \
+        if [ "$existing_user" != "$user" ]; then \
+            userdel -f "$existing_user"; \
+        fi; \
+    fi; \
+    if ! getent passwd "$user" > /dev/null; then \
+        useradd -G sudo,www-data -u "$uid" -d /home/"$user" "$user"; \
+    fi; \
+fi
+
 RUN mkdir -p /home/$user/.composer && \
     chown -R $user:$user /home/$user
 
