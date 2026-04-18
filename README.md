@@ -94,20 +94,43 @@ Snipto employs a multi-layered defense-in-depth strategy to protect user data an
 
 ---
 
-## Development & Deployment
+## Deployment & Development
 
-Snipto is Dockerized for both production and development environments. By default, the application deploys in **production mode**.
+### Quick Start (Docker Hub)
+
+The fastest way to run Snipto is using the official image. This method does not require cloning the repository.
+
+```bash
+docker run -d \
+  --name snipto \
+  -p 8080:8080 \
+  -e APP_KEY=base64:$(openssl rand -base64 32) \
+  -e DB_CONNECTION=sqlite \
+  -e DB_DATABASE=/tmp/database.sqlite \
+  tchubaba/snipto:latest
+```
+
+Visit `http://localhost:8080` to start sharing snippets.
+
+**Note:** For persistence, it is recommended to mount a volume for the SQLite database so your data survives container updates. For high-traffic environments, you should probably connect to an external MariaDB/MySQL instance.
+
+---
+
+### Local Development (GitHub Clone)
+
+Snipto is Dockerized for both production and development environments.
 
 ### Environment Modes
 
-The deployment mode is controlled by the `APP_ENV` environment variable:
+When working with a cloned repository, the default mode is **Development**. The deployment mode is controlled by the `APP_ENV` environment variable in your `.env` file:
 
-- **Production (Default):** Optimizes the application for performance. It runs `composer install --no-dev`, caches configurations and routes, and builds production assets with Vite.
-- **Development:** Set `APP_ENV=local` to enable development features. This mode installs dev-dependencies, generates IDE helper files, and starts the Vite development server with hot-module replacement.
+- **Development (Default):** Set `APP_ENV=local` (default in `.env.example`). This mode installs dev-dependencies, generates IDE helper files, and starts the Vite development server with hot-module replacement.
+- **Production:** Set `APP_ENV=production`. This mode optimizes the application for performance, runs `composer install --no-dev`, caches configurations, and builds production assets.
 
-To switch to development mode:
-1. Update your `.env` or set the environment variable: `APP_ENV=local`.
+To switch modes:
+1. Update your `.env` file (e.g., `APP_ENV=local` or `APP_ENV=production`).
 2. Rebuild and start the containers: `make build && make up`.
+
 
 ### External Database
 
