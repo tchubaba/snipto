@@ -28,37 +28,43 @@ if [ "$APP_ENV" = "local" ]; then
     npm install
     npm run dev &
     
+    # Initialize GrumPHP
+    php ./vendor/bin/grumphp git:init || true
 else
     echo "Running in PRODUCTION mode..."
     
-    echo "Installing dependencies (optimized)..."
-    composer install --no-dev --optimize-autoloader --no-interaction --quiet
-    
+    # In a standalone image, dependencies and assets are already built.
+    # We only need to ensure the APP_KEY is set if it's passed via environment.
     if ! grep -q "APP_KEY=base64" .env; then
-        echo "Generating application key..."
-        php artisan key:generate
+        if [ -n "$APP_KEY" ]; then
+             echo "Using APP_KEY from environment."
+             sed -i "s|APP_KEY=.*|APP_KEY=${APP_KEY}|" .env
+        else
+            echo "Generating application key..."
+            php artisan key:generate
+        fi
     fi
     
     echo "Caching configuration and routes..."
     php artisan optimize
     php artisan view:cache
-    
-    echo "Building assets..."
-    rm -f public/hot
-    npm install
-    npm run build
 fi
 
-# Wait for database to be ready
-echo "Waiting for database migration..."
+# Handle SQLite initialization if needed
+if [ "$DB_CONNECTION" = "sqlite" ]; then
+    if [ ! -f "$DB_DATABASE" ]; then
+        echo "Initializing SQLite database at $DB_DATABASE..."
+        mkdir -p "$(dirname "$DB_DATABASE")"
+        touch "$DB_DATABASE"
+    fi
+fi
+
+# Wait for database to be ready and run migrations
+echo "Running migrations..."
 until php artisan migrate --force; do
-    sleep 1
+    echo "Migration failed, retrying in 2 seconds..."
+    sleep 2
 done
-
-# Initialize GrumPHP in dev mode
-if [ "$APP_ENV" = "local" ]; then
-    php ./vendor/bin/grumphp git:init || true
-fi
 
 # Start background workers
 echo "Starting queue worker..."
@@ -69,4 +75,4 @@ PORT=${APP_PORT:-8080}
 
 # Start the application
 echo "Starting PHP server on port $PORT..."
-php artisan serve --host=0.0.0.0 --port=$PORT
+exec php artisan serve --host=0.0.0.0 --port=$PORT

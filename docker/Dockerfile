@@ -1,9 +1,9 @@
-FROM php:8.3-fpm
+FROM php:8.3-cli
 
 USER root
 
 # Arguments defined in docker-compose.yml
-# Defaults provided for production/CI builds where these aren't passed
+# Defaults provided for standalone/CI builds
 ARG user=snipto
 ARG uid=1000
 
@@ -27,13 +27,7 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl
 
-# Install Xdebug (conditionally)
-ARG INSTALL_XDEBUG=false
-RUN if [ "$INSTALL_XDEBUG" = "true" ]; then \
-    pecl install xdebug && docker-php-ext-enable xdebug; \
-fi
-
-# Install Node.js (Vite needs it)
+# Install Node.js (needed for building assets)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
@@ -41,7 +35,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Create system user to run Composer and Artisan Commands
-# We use a more robust check and avoid deleting existing system users if possible
+# Robust check to prevent build failure if UID exists
 RUN if [ "$uid" != "0" ]; then \
     if getent passwd "$uid" > /dev/null; then \
         existing_user=$(getent passwd "$uid" | cut -d: -f1); \
@@ -60,7 +54,19 @@ RUN mkdir -p /home/$user/.composer && \
 # Set working directory
 WORKDIR /var/www/html
 
+# Copy project files and set ownership
+COPY --chown=$user:$user . .
+
+# Install dependencies and build assets
+# This ensures the Docker Hub image is ready-to-run
+USER $user
+RUN composer install --no-dev --optimize-autoloader --no-interaction \
+    && npm install \
+    && npm run build \
+    && rm -rf node_modules
+
 # Copy entrypoint script and make it executable
+USER root
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
