@@ -13,7 +13,8 @@ $finder = (new Finder())
         'vendor',
     ])
     ->notPath('public/index.php')
-    ->notPath('artisan');
+    ->notPath('artisan')
+    ->notPath('_ide_helper.php');
 
 return (new Config())
     ->setRules([

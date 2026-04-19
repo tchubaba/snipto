@@ -1,4 +1,4 @@
-FROM php:8.3-cli
+FROM php:8.5-cli
 
 USER root
 
@@ -6,6 +6,7 @@ USER root
 # Defaults provided for standalone/CI builds
 ARG user=snipto
 ARG uid=1000
+ARG APP_ENV=production
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -19,13 +20,22 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     libicu-dev \
     gnupg \
-    procps
+    procps \
+    autoconf \
+    g++ \
+    make
 
 # Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl
+
+# Install Xdebug if in local environment
+RUN if [ "$APP_ENV" = "local" ]; then \
+    pecl install xdebug && \
+    docker-php-ext-enable xdebug; \
+fi
 
 # Install Node.js (needed for building assets)
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -57,13 +67,19 @@ WORKDIR /var/www/html
 # Copy project files and set ownership
 COPY --chown=$user:$user . .
 
-# Install dependencies and build assets
-# This ensures the Docker Hub image is ready-to-run
+# Install dependencies and build assets based on APP_ENV.
+# Production (incl. Docker Hub image): bake deps + built assets into the image for fast startup.
+# Local (development): skip — the bind mount hides image contents; entrypoint handles install on boot.
 USER $user
-RUN composer install --no-dev --optimize-autoloader --no-interaction \
-    && npm install \
-    && npm run build \
-    && rm -rf node_modules
+RUN if [ "$APP_ENV" = "local" ]; then \
+        echo "Local/development build — deferring composer install and asset build to entrypoint."; \
+    else \
+        composer install --no-dev --optimize-autoloader --no-interaction \
+        && npm install \
+        && npm run build \
+        && rm -rf node_modules \
+        && touch vendor/.snipto-baked; \
+    fi
 
 # Copy entrypoint script and make it executable
 USER root

@@ -12,29 +12,50 @@ APP_ENV=${APP_ENV:-production}
 
 if [ "$APP_ENV" = "local" ]; then
     echo "Running in DEVELOPMENT mode..."
-    
+
     echo "Installing dependencies..."
     composer install --no-interaction
-    
+
     if ! grep -q "APP_KEY=base64" .env; then
         echo "Generating application key..."
         php artisan key:generate
     fi
-    
+
     echo "Generating IDE helper files..."
     php artisan ide-helper:generate || true
-    
+
     echo "Installing and starting Node.js assets..."
     npm install
     npm run dev &
-    
+
     # Initialize GrumPHP
     php ./vendor/bin/grumphp git:init || true
 else
     echo "Running in PRODUCTION mode..."
-    
-    # In a standalone image, dependencies and assets are already built.
-    # We only need to ensure the APP_KEY is set if it's passed via environment.
+
+    # Stale hot file from a prior dev session would route asset URLs to the Vite dev server.
+    if [ -f public/hot ]; then
+        echo "Removing stale Vite hot file..."
+        rm -f public/hot
+    fi
+
+    # The marker file is dropped during the prod build inside vendor/. When the Docker Hub image
+    # runs without a bind mount, the marker is visible — so we skip install/build and never touch
+    # the network. With a local bind mount, the marker is hidden and we rebuild from source
+    # (composer install also prunes dev deps when switching from development mode).
+    if [ -f vendor/.snipto-baked ]; then
+        echo "Image is pre-baked; skipping composer install and asset build."
+    else
+        echo "Installing PHP dependencies..."
+        composer install --no-dev --optimize-autoloader --no-interaction
+
+        if [ ! -d public/build ] || [ -z "$(ls -A public/build 2>/dev/null)" ]; then
+            echo "Building frontend assets..."
+            npm install
+            npm run build
+        fi
+    fi
+
     if ! grep -q "APP_KEY=base64" .env; then
         if [ -n "$APP_KEY" ]; then
              echo "Using APP_KEY from environment."
@@ -44,7 +65,7 @@ else
             php artisan key:generate
         fi
     fi
-    
+
     echo "Caching configuration and routes..."
     php artisan optimize
     php artisan view:cache
