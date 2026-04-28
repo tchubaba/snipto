@@ -61,6 +61,10 @@ fi
 RUN mkdir -p /home/$user/.composer && \
     chown -R $user:$user /home/$user
 
+# Pre-create /data so a mounted named volume inherits $user ownership.
+# Without this, Docker creates the mountpoint as root:root and SQLite init fails.
+RUN mkdir -p /data && chown $user:$user /data
+
 # Set working directory
 WORKDIR /var/www/html
 

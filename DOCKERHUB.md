@@ -29,13 +29,14 @@ Built on Laravel 13, PHP 8.5, Alpine.js (CSP build), Tailwind CSS 4.
 docker run -d \
   --name snipto \
   -p 8080:8080 \
+  -e APP_KEY=base64:$(openssl rand -base64 32) \
   -e DB_CONNECTION=sqlite \
   -e DB_DATABASE=/data/snipto.sqlite \
   -v snipto-data:/data \
   tchubaba/snipto:latest
 ```
 
-Open http://localhost:8080 and start sharing. An `APP_KEY` is generated automatically on first boot if you don't provide one.
+Open http://localhost:8080 and start sharing. Set `APP_KEY` once and reuse the same value across container recreations — otherwise existing sessions and signed URLs become invalid (snippet content is encrypted client-side and is unaffected). If you omit `APP_KEY`, one is auto-generated on first boot but it lives in the container's ephemeral `.env` and will rotate on every recreation.
 
 ---
 
