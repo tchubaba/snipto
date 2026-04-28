@@ -1,6 +1,8 @@
 @extends('layouts.main')
 
 @section('header-js')
+    @vite(['resources/js/sodium-bundle.js'])
+    <script src="{{ asset('build/js/wordlist.js') }}?v={{ file_exists(public_path('build/js/wordlist.js')) ? filemtime(public_path('build/js/wordlist.js')) : '0' }}"></script>
     <script type="module" src="{{ asset('build/js/sniptoid.js') }}?v={{ file_exists(public_path('build/js/sniptoid.js')) ? filemtime(public_path('build/js/sniptoid.js')) : '0' }}"></script>
 @endsection
 
@@ -17,8 +19,12 @@
                 'Passphrase must be at least 16 characters.' => __('Passphrase must be at least 16 characters.'),
                 'Your browser does not support this feature. Please update your browser.' => __('Your browser does not support this feature. Please update your browser.'),
                 'Failed to generate Snipto ID. Please try again.' => __('Failed to generate Snipto ID. Please try again.'),
-                'Weak passphrase — consider adding more variety or length' => __('Weak passphrase — consider adding more variety or length'),
-                'Good passphrase strength' => __('Good passphrase strength'),
+                'Weak — easy to crack' => __('Weak — easy to crack'),
+                'Okay — could be stronger' => __('Okay — could be stronger'),
+                'Good' => __('Good'),
+                'Strong' => __('Strong'),
+                'Reveal or copy your passphrase first.' => __('Reveal or copy your passphrase first.'),
+                'Copying failed. Please copy manually.' => __('Copying failed. Please copy manually.'),
             ]);
         @endphp
     </script>
@@ -36,13 +42,13 @@
          x-init="init()">
 
         <!-- Browser Support Warning -->
-        <div x-show="x25519Supported === false" x-cloak
+        <div x-show="cryptoSupported === false" x-cloak
              class="text-sm text-center text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg border border-orange-200 dark:border-orange-800">
             {!! __('Your browser does not support this feature. Please update your browser.') !!}
         </div>
 
         <!-- Main Content -->
-        <div x-show="x25519Supported !== false">
+        <div x-show="cryptoSupported !== false">
             <div class="text-center space-y-2 mb-6">
                 <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 mb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -59,15 +65,42 @@
 
             <div class="space-y-4">
                 <div class="space-y-1">
-                    <input type="password" x-model="passphrase"
-                           @keydown.enter="deriveSniptoid()"
-                           placeholder="{{ __('Enter a passphrase (min 16 characters)') }}"
-                           class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
-                    <p class="text-xs text-gray-400 dark:text-gray-500 text-right"
-                       :class="passphrase.length >= 16 ? 'text-green-500 dark:text-green-400' : ''">
-                        <span x-text="passphrase.length"></span> / 16 {{ __('characters minimum') }}
+                    <div class="relative">
+                        <input :type="passphraseRevealed ? 'text' : 'password'" x-model="passphrase"
+                               @input="onPassphraseInput()"
+                               @keydown.enter="deriveSniptoid()"
+                               placeholder="{{ __('Enter a passphrase (min 16 characters)') }}"
+                               class="w-full border rounded-lg p-3 pr-24 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-2 space-x-1">
+                            <button type="button" @click="togglePassphraseReveal()"
+                                    x-show="passphrase.length > 0"
+                                    :title="passphraseRevealed ? '{{ __('Hide') }}' : '{{ __('Show') }}'"
+                                    class="p-1 text-gray-400 hover:text-indigo-500">
+                                <svg x-show="!passphraseRevealed" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                <svg x-show="passphraseRevealed" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18M10.584 10.587a2 2 0 002.828 2.83M9.363 5.365A9.466 9.466 0 0112 5c4.477 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411M6.1 6.1A10.025 10.025 0 002.458 12C3.732 16.057 7.523 19 12 19c1.66 0 3.227-.405 4.6-1.122"/></svg>
+                            </button>
+                            <button type="button" @click="copyPassphrase()"
+                                    x-show="passphrase.length > 0"
+                                    :title="'{{ __('Copy') }}'"
+                                    class="p-1 text-gray-400 hover:text-indigo-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <button type="button" @click="generatePassphrase()"
+                                class="text-indigo-500 hover:underline">
+                            {{ __('Generate for me') }}
+                        </button>
+                        <span class="text-gray-400 dark:text-gray-500"
+                              :class="passphrase.length >= 20 ? 'text-green-500 dark:text-green-400' : ''">
+                            <span x-text="passphrase.length"></span> / 20 {{ __('characters minimum') }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-400 dark:text-gray-500">
+                        {{ __('Use 6+ random words or a long unique phrase — not a password you reuse.') }}
                     </p>
-                    <div x-show="passphrase.length >= 16" x-cloak class="mt-1">
+                    <div x-show="passphrase.length >= 20" x-cloak class="mt-1">
                         <div class="flex gap-1 h-1">
                             <div class="flex-1 rounded-full transition-colors duration-300"
                                  :class="passphraseStrength() >= 1 ? 'bg-red-400' : 'bg-gray-200 dark:bg-gray-700'"></div>
@@ -81,14 +114,18 @@
                                  :class="passphraseStrength() >= 5 ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'"></div>
                         </div>
                         <p class="text-xs mt-1 text-center"
-                           :class="passphraseStrength() < 3 ? 'text-orange-500 dark:text-orange-400' : 'text-green-500 dark:text-green-400'"
-                           x-text="passphraseStrength() < 3 ? t('Weak passphrase — consider adding more variety or length') : t('Good passphrase strength')">
+                           :class="passphraseStrength() < 3 ? 'text-orange-500 dark:text-orange-400' : (passphraseStrength() < 4 ? 'text-yellow-500 dark:text-yellow-400' : 'text-green-500 dark:text-green-400')"
+                           x-text="passphraseStrength() < 3 ? t('Weak — easy to crack') : (passphraseStrength() < 4 ? t('Okay — could be stronger') : (passphraseStrength() < 5 ? t('Good') : t('Strong')))">
                         </p>
                     </div>
+                    <p x-show="passphraseGenerated && !passphraseAcknowledged" x-cloak
+                       class="text-xs text-orange-500 dark:text-orange-400 mt-1">
+                        {{ __('Reveal or copy your passphrase first.') }}
+                    </p>
                 </div>
 
                 <button @click="deriveSniptoid()"
-                        :disabled="loading || passphrase.length < 16"
+                        :disabled="loading || passphrase.length < 20 || (passphraseGenerated && !passphraseAcknowledged)"
                         class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                     <span x-show="!loading">{!! __('Generate Snipto ID') !!}</span>
                     <span x-show="loading" x-cloak class="flex items-center justify-center space-x-2">
@@ -126,7 +163,7 @@
                 </div>
                 <div class="text-xs text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700 space-y-1">
                     <p>{!! __('Share this Snipto ID with anyone who wants to send you encrypted messages.') !!}</p>
-                    <p class="font-medium">{!! __('Remember your passphrase — it is the only way to decrypt messages sent to this ID.') !!}</p>
+                    <p class="font-medium">{!! __('Save this Snipto ID — both your passphrase AND this ID are required to decrypt messages.') !!}</p>
                 </div>
             </div>
         </div>

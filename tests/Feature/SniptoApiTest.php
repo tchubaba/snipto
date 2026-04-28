@@ -169,9 +169,10 @@ class SniptoApiTest extends TestCase
     #[Test]
     public function it_can_store_a_snipto_id_encrypted_snippet()
     {
-        $nonce        = bin2hex(random_bytes(12));
-        $keyHash      = hash('sha256', random_bytes(32));
-        $senderPubKey = base64_encode(random_bytes(32)); // 44 chars
+        $nonce          = bin2hex(random_bytes(12));
+        $keyHash        = hash('sha256', random_bytes(32));
+        $senderPubKey   = base64_encode(random_bytes(32)); // 44 chars
+        $recipientSalt  = base64_encode(random_bytes(16)); // 24 chars
 
         $response = $this->postJson('/api/snipto', [
             'slug'              => 'test-snipto-id',
@@ -181,6 +182,7 @@ class SniptoApiTest extends TestCase
             'protection_type'   => ProtectionType::SniptoId->value,
             'sender_public_key' => $senderPubKey,
             'key_provider_type' => 'passphrase',
+            'recipient_salt'    => $recipientSalt,
             'expiration'        => '1d',
         ]);
 
@@ -192,14 +194,16 @@ class SniptoApiTest extends TestCase
             'protection_type'   => ProtectionType::SniptoId->value,
             'sender_public_key' => $senderPubKey,
             'key_provider_type' => 'passphrase',
+            'recipient_salt'    => $recipientSalt,
         ]);
     }
 
     #[Test]
     public function it_returns_sender_public_key_for_snipto_id_type()
     {
-        $senderPubKey = base64_encode(random_bytes(32));
-        $keyHash      = hash('sha256', 'recipient-pub');
+        $senderPubKey  = base64_encode(random_bytes(32));
+        $recipientSalt = base64_encode(random_bytes(16));
+        $keyHash       = hash('sha256', 'recipient-pub');
 
         Snipto::create([
             'slug'              => 'sid-slug',
@@ -209,6 +213,7 @@ class SniptoApiTest extends TestCase
             'protection_type'   => ProtectionType::SniptoId,
             'sender_public_key' => $senderPubKey,
             'key_provider_type' => 'passphrase',
+            'recipient_salt'    => $recipientSalt,
             'expires_at'        => Carbon::now()->addDay(),
             'views_remaining'   => 1,
         ]);
@@ -220,6 +225,7 @@ class SniptoApiTest extends TestCase
                 'protection_type'   => ProtectionType::SniptoId->value,
                 'sender_public_key' => $senderPubKey,
                 'key_provider_type' => 'passphrase',
+                'recipient_salt'    => $recipientSalt,
             ])
             ->assertJsonMissing(['payload']);
 
@@ -244,7 +250,40 @@ class SniptoApiTest extends TestCase
             'nonce'           => bin2hex(random_bytes(12)),
             'key_hash'        => hash('sha256', 'test'),
             'protection_type' => ProtectionType::SniptoId->value,
+            'recipient_salt'  => base64_encode(random_bytes(16)),
             // missing sender_public_key
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    #[Test]
+    public function it_rejects_snipto_id_without_recipient_salt()
+    {
+        $response = $this->postJson('/api/snipto', [
+            'slug'              => 'no-salt',
+            'payload'           => base64_encode('data'),
+            'nonce'             => bin2hex(random_bytes(12)),
+            'key_hash'          => hash('sha256', 'test'),
+            'protection_type'   => ProtectionType::SniptoId->value,
+            'sender_public_key' => base64_encode(random_bytes(32)),
+            // missing recipient_salt
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    #[Test]
+    public function it_rejects_snipto_id_with_malformed_recipient_salt()
+    {
+        $response = $this->postJson('/api/snipto', [
+            'slug'              => 'bad-salt',
+            'payload'           => base64_encode('data'),
+            'nonce'             => bin2hex(random_bytes(12)),
+            'key_hash'          => hash('sha256', 'test'),
+            'protection_type'   => ProtectionType::SniptoId->value,
+            'sender_public_key' => base64_encode(random_bytes(32)),
+            'recipient_salt'    => 'not-valid-base64-of-correct-length',
         ]);
 
         $response->assertStatus(422);
@@ -253,9 +292,10 @@ class SniptoApiTest extends TestCase
     #[Test]
     public function it_allows_snipto_id_with_custom_expiration()
     {
-        $nonce        = bin2hex(random_bytes(12));
-        $keyHash      = hash('sha256', random_bytes(32));
-        $senderPubKey = base64_encode(random_bytes(32));
+        $nonce         = bin2hex(random_bytes(12));
+        $keyHash       = hash('sha256', random_bytes(32));
+        $senderPubKey  = base64_encode(random_bytes(32));
+        $recipientSalt = base64_encode(random_bytes(16));
 
         $response = $this->postJson('/api/snipto', [
             'slug'              => 'sid-expiry-test',
@@ -264,6 +304,7 @@ class SniptoApiTest extends TestCase
             'key_hash'          => $keyHash,
             'protection_type'   => ProtectionType::SniptoId->value,
             'sender_public_key' => $senderPubKey,
+            'recipient_salt'    => $recipientSalt,
             'expiration'        => '1w',
         ]);
 

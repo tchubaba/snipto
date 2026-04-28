@@ -18,6 +18,7 @@
     "dependencies": {
         "@alpinejs/csp": "^3.15.0",
         "flag-icons": "^7.5.0",
+        "libsodium-wrappers-sumo": "^0.8.4",
         "qrcode": "^1.5.4"
     }
 }

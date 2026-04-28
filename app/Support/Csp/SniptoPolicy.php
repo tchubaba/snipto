@@ -24,6 +24,7 @@ class SniptoPolicy extends Basic
             ->add(Directive::CONNECT, [Keyword::SELF, config('app.url')])
             ->add(Directive::FRAME_ANCESTORS, Keyword::NONE)
             ->add(Directive::MANIFEST, Keyword::SELF)
-            ->add(Directive::REQUIRE_TRUSTED_TYPES_FOR, Keyword::SCRIPT);
+            ->add(Directive::REQUIRE_TRUSTED_TYPES_FOR, Keyword::SCRIPT)
+            ->add(Directive::SCRIPT, Keyword::UNSAFE_WEB_ASSEMBLY_EXECUTION);
     }
 }

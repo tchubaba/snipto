@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $nonce
  * @property string|null $sender_public_key
  * @property string|null $key_provider_type
+ * @property string|null $recipient_salt
  * @property int|null $views_remaining
  * @property ProtectionType $protection_type
  * @property Carbon $expires_at
@@ -49,6 +50,7 @@ class Snipto extends Model
         'nonce',
         'sender_public_key',
         'key_provider_type',
+        'recipient_salt',
         'views_remaining',
         'protection_type',
         'expires_at',
@@ -61,6 +63,7 @@ class Snipto extends Model
         'nonce'             => 'string',
         'sender_public_key' => 'string',
         'key_provider_type' => 'string',
+        'recipient_salt'    => 'string',
         'views_remaining'   => 'integer',
         'protection_type'   => ProtectionType::class,
         'expires_at'        => 'datetime',

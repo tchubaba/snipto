@@ -3,7 +3,7 @@
     "name": "tchubaba/snipto",
     "type": "project",
     "description": "A secure, lightweight online snippet sharing service with end-to-end encryption.",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "keywords": [
         "snipto",
         "snippet",

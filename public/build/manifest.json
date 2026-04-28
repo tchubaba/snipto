@@ -20,7 +20,7 @@
     "src": "node_modules/flag-icons/flags/4x3/us.svg"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CFID2yp-.css",
+    "file": "assets/app-DqxAp4Y-.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -32,6 +32,12 @@
     "file": "js/app-3n7ePyoW.js",
     "name": "app",
     "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/sodium-bundle.js": {
+    "file": "js/sodium-bundle-D84qSOz8.js",
+    "name": "sodium-bundle",
+    "src": "resources/js/sodium-bundle.js",
     "isEntry": true
   }
 }

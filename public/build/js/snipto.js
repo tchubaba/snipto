@@ -9,6 +9,18 @@ async function supportsX25519() {
 }
 window.supportsX25519 = supportsX25519;
 
+// Feature detection for Argon2id (via libsodium.js / WebAssembly)
+async function supportsArgon2id() {
+    try {
+        if (typeof WebAssembly === 'undefined' || typeof window.sodium === 'undefined') return false;
+        await window.sodium.ready;
+        return typeof window.sodium.crypto_pwhash === 'function';
+    } catch {
+        return false;
+    }
+}
+window.supportsArgon2id = supportsArgon2id;
+
 export function sniptoComponent() {
     return {
         slug: null,
@@ -43,10 +55,14 @@ export function sniptoComponent() {
         showWeakPasswordModal: false,
         sniptoIdInput: '',
         sniptoIdPassphrase: '',
-        x25519Supported: null,
+        cryptoSupported: null,
         senderPublicKey: null,
         keyProviderType: null,
+        recipientSalt: null,
         showSniptoIdPrompt: false,
+        passwordRevealed: false,
+        passwordAcknowledged: false,
+        passwordGenerated: false,
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
@@ -64,7 +80,8 @@ export function sniptoComponent() {
                 document.documentElement.classList.add('dark');
             }
 
-            this.x25519Supported = await supportsX25519();
+            const [x25519Ok, argon2Ok] = await Promise.all([supportsX25519(), supportsArgon2id()]);
+            this.cryptoSupported = x25519Ok && argon2Ok;
 
             if (!this.slug) {
                 this.showForm = true;
@@ -127,6 +144,7 @@ export function sniptoComponent() {
                     // Mode 3: Snipto ID (Asymmetric)
                     this.senderPublicKey = data.sender_public_key;
                     this.keyProviderType = data.key_provider_type;
+                    this.recipientSalt   = data.recipient_salt;
                     this.showSniptoIdPrompt = true;
                 }
             } catch {
@@ -175,7 +193,9 @@ export function sniptoComponent() {
 
                 const data = await res.json();
                 this.nonce = this.hexToBytes(data.nonce);
-                const { encKey, hmacKey } = await this.deriveKeys(secretBytes, data.nonce);
+                const { encKey, hmacKey } = this.protectionType === 2
+                    ? await this.deriveKeysFromPassword(secretBytes, data.nonce)
+                    : await this.deriveKeys(secretBytes, data.nonce);
 
                 const payloadBytes = this.base64ToBytes(data.payload);
                 const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, this.nonce, hmacKey, data.nonce);
@@ -321,27 +341,48 @@ export function sniptoComponent() {
                 // Append iframe
                 container.appendChild(iframe);
 
-                // Recalculate height on window resize
-                const resizeHandler = () => {
-                    let newContentWidth = container.clientWidth - paddingLeft - paddingRight;
-                    if (newContentWidth <= 0) {
-                        newContentWidth = window.innerWidth - 32;
+                // Measure the iframe's actual rendered content. The canvas estimate above is only
+                // a placeholder to avoid a layout flash; the real height comes from the live DOM
+                // inside the iframe, which accounts for the rendered font, container width, and
+                // scrollbar gutter. Without this, content can be truncated until a window resize
+                // forces a reflow.
+                let resizeObserver = null;
+                const adjustHeight = () => {
+                    try {
+                        const doc = iframe.contentDocument;
+                        if (!doc || !doc.documentElement) return;
+                        const measured = Math.max(
+                            doc.documentElement.scrollHeight,
+                            doc.body ? doc.body.scrollHeight : 0
+                        );
+                        if (measured > 0) {
+                            iframe.style.height = `${measured}px`;
+                        }
+                    } catch {
+                        // contentDocument inaccessible (sandbox edge case) — leave the canvas estimate.
                     }
-                    let newHeight = 0;
-                    for (const lineWidth of this.lineWidths) {
-                        let adjustedWidth = lineWidth * 1.02;
-                        const wrappedLines = Math.ceil(adjustedWidth / newContentWidth) || 1;
-                        newHeight += wrappedLines * lineHeight;
-                    }
-                    newHeight += lineHeight * 1;
-                    console.log('Resize - New content width:', newContentWidth, 'New height:', newHeight);
-                    iframe.style.height = `${newHeight}px`;
                 };
+
+                iframe.addEventListener('load', () => {
+                    adjustHeight();
+                    try {
+                        const root = iframe.contentDocument && iframe.contentDocument.documentElement;
+                        if (root && typeof ResizeObserver !== 'undefined') {
+                            resizeObserver = new ResizeObserver(() => adjustHeight());
+                            resizeObserver.observe(root);
+                        }
+                    } catch {
+                        // No-op: resize handler below still covers viewport changes.
+                    }
+                });
+
+                const resizeHandler = () => adjustHeight();
                 window.addEventListener('resize', resizeHandler);
 
                 // Store cleanup function
                 this.cleanupFunctions.push(() => {
                     window.removeEventListener('resize', resizeHandler);
+                    if (resizeObserver) resizeObserver.disconnect();
                 });
             };
 
@@ -388,6 +429,11 @@ export function sniptoComponent() {
                     return;
                 }
 
+                if (this.passwordGenerated && !this.passwordAcknowledged) {
+                    this.showToastMessage(this.t('Reveal or copy your passphrase first.'));
+                    return;
+                }
+
                 // Check for weak password unless bypassed
                 if (!bypass && this.analyzePasswordStrength(this.protectionPassword) < 3) {
                     this.showWeakPasswordModal = true;
@@ -402,6 +448,7 @@ export function sniptoComponent() {
 
             let senderPublicKey = null;
             let keyProviderType = null;
+            let recipientSaltBase64 = null;
 
             // Encryption Logic based on Mode
             if (finalProtectionType === 1 || finalProtectionType === 2) {
@@ -419,7 +466,9 @@ export function sniptoComponent() {
                 nonceHex = await this.generateRandomBytes(12);
                 this.nonce = this.hexToBytes(nonceHex);
 
-                const { encKey, hmacKey } = await this.deriveKeys(secretBytes, nonceHex);
+                const { encKey, hmacKey } = finalProtectionType === 2
+                    ? await this.deriveKeysFromPassword(secretBytes, nonceHex)
+                    : await this.deriveKeys(secretBytes, nonceHex);
                 this.key = encKey;
                 this.hmacKey = hmacKey;
 
@@ -438,11 +487,18 @@ export function sniptoComponent() {
                     return;
                 }
 
-                if (!/^[A-Za-z0-9+/]{43}=$/.test(this.sniptoIdInput.trim())) {
+                if (!/^[A-Za-z0-9+/]{64}$/.test(this.sniptoIdInput.trim())) {
                     this.showToastMessage(this.t('Invalid Snipto ID format.'));
                     this.loading = false;
                     return;
                 }
+
+                // v3: Snipto ID = base64(salt(16) || pubkey(32))
+                const idBytes = this.base64ToBytes(this.sniptoIdInput.trim());
+                const recipientSaltBytes = idBytes.slice(0, 16);
+                const recipientPubkeyBytes = idBytes.slice(16);
+                const recipientPubkeyBase64 = this.bytesToBase64(recipientPubkeyBytes); // 44 chars with '='
+                recipientSaltBase64 = this.bytesToBase64(recipientSaltBytes); // 24 chars with '=='
 
                 // Generate ephemeral X25519 key pair
                 const ephemeralPair = await crypto.subtle.generateKey(
@@ -455,7 +511,7 @@ export function sniptoComponent() {
 
                 // Derive shared secret via ECDH(ephemeralPrivate, recipientPublic)
                 const { encKey, hmacKey, sharedBytes } = await this.deriveKeysFromECDH(
-                    ephemeralPair.privateKey, this.sniptoIdInput, senderPublicKey
+                    ephemeralPair.privateKey, recipientPubkeyBase64, senderPublicKey
                 );
 
                 nonceHex = await this.generateRandomBytes(12);
@@ -504,6 +560,7 @@ export function sniptoComponent() {
                         ...(finalProtectionType === 3 ? {
                             sender_public_key: senderPublicKey,
                             key_provider_type: keyProviderType,
+                            recipient_salt:    recipientSaltBase64,
                         } : {}),
                     }),
                     credentials: 'same-origin'
@@ -540,18 +597,17 @@ export function sniptoComponent() {
             }
         },
 
-        // SYNC: deriveX25519KeyPair is also in sniptoid.js — keep both in sync
-        async deriveX25519KeyPair(passphrase) {
-            const enc = new TextEncoder();
-            const salt = enc.encode('snipto-identity-v1');
-            const keyMaterial = await crypto.subtle.importKey(
-                'raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveBits']
-            );
-            const rawPrivateBytes = new Uint8Array(
-                await crypto.subtle.deriveBits(
-                    { name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' },
-                    keyMaterial, 256
-                )
+        // SYNC: deriveX25519KeyPair is also in sniptoid.js — the derivation block must match byte-for-byte.
+        // `salt` is a 16-byte Uint8Array supplied by the caller (per-Snipto-ID random in v3).
+        async deriveX25519KeyPair(passphrase, salt) {
+            await sodium.ready;
+            const rawPrivateBytes = sodium.crypto_pwhash(
+                32,
+                passphrase,
+                salt,
+                3,
+                64 * 1024 * 1024,
+                sodium.crypto_pwhash_ALG_ARGON2ID13
             );
 
             // PKCS8 wrapper for X25519: fixed 16-byte ASN.1 header + 32-byte private key
@@ -639,15 +695,22 @@ export function sniptoComponent() {
         async unlockWithSniptoId() {
             if (!this.sniptoIdPassphrase.trim()) return;
 
-            if (this.sniptoIdPassphrase.length < 16) {
-                this.showToastMessage(this.t('Passphrase must be at least 16 characters.'));
+            if (this.sniptoIdPassphrase.length < 20) {
+                this.showToastMessage(this.t('Passphrase must be at least 20 characters.'));
                 return;
             }
 
             this.loading = true;
 
+            if (!this.recipientSalt || !/^[A-Za-z0-9+/]{22}==$/.test(this.recipientSalt)) {
+                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
+                this.loading = false;
+                return;
+            }
+
             try {
-                const { privateKey, publicKeyBase64 } = await this.deriveX25519KeyPair(this.sniptoIdPassphrase);
+                const saltBytes = this.base64ToBytes(this.recipientSalt);
+                const { privateKey, publicKeyBase64 } = await this.deriveX25519KeyPair(this.sniptoIdPassphrase, saltBytes);
 
                 // Compute ECDH shared secret with sender's ephemeral public key (available from init())
                 const { encKey, hmacKey, sharedBytes } = await this.deriveKeysFromECDH(
@@ -759,6 +822,51 @@ export function sniptoComponent() {
             return { encKey, hmacKey };
         },
 
+        async deriveKeysFromPassword(passwordBytes, nonceHex) {
+            await sodium.ready;
+
+            const enc = new TextEncoder();
+            const saltInput = new Uint8Array(enc.encode('snipto-password-v2').length + enc.encode(nonceHex).length);
+            saltInput.set(enc.encode('snipto-password-v2'));
+            saltInput.set(enc.encode(nonceHex), enc.encode('snipto-password-v2').length);
+            const saltDigest = await crypto.subtle.digest('SHA-256', saltInput);
+            const salt = new Uint8Array(saltDigest).slice(0, 16);
+
+            const master = sodium.crypto_pwhash(
+                32,
+                passwordBytes,
+                salt,
+                3,
+                64 * 1024 * 1024,
+                sodium.crypto_pwhash_ALG_ARGON2ID13
+            );
+
+            const hkdfKey = await crypto.subtle.importKey(
+                'raw', master, 'HKDF', false, ['deriveKey']
+            );
+            master.fill(0);
+
+            const hkdfSalt = enc.encode(nonceHex);
+
+            const encKey = await crypto.subtle.deriveKey(
+                { name: 'HKDF', hash: 'SHA-256', salt: hkdfSalt, info: enc.encode('aes-key') },
+                hkdfKey,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+
+            const hmacKey = await crypto.subtle.deriveKey(
+                { name: 'HKDF', hash: 'SHA-256', salt: hkdfSalt, info: enc.encode('hmac-key') },
+                hkdfKey,
+                { name: 'HMAC', hash: 'SHA-256', length: 256 },
+                false,
+                ['sign', 'verify']
+            );
+
+            return { encKey, hmacKey };
+        },
+
         async encryptPayload(plainBytes, encKey, nonce, hmacKey, nonceHex) {
             const encrypted = await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv: nonce, tagLength: 128 },
@@ -828,6 +936,39 @@ export function sniptoComponent() {
             return Array.from(new Uint8Array(hashBuffer))
                 .map(b => b.toString(16).padStart(2, '0'))
                 .join('');
+        },
+
+        generatePassword() {
+            this.protectionPassword = window.generateDicewarePassphrase(6);
+            this.passwordGenerated = true;
+            this.passwordAcknowledged = false;
+            this.passwordRevealed = false;
+        },
+
+        onPasswordInput() {
+            if (this.passwordGenerated) {
+                this.passwordGenerated = false;
+                this.passwordAcknowledged = false;
+            }
+        },
+
+        togglePasswordReveal() {
+            this.passwordRevealed = !this.passwordRevealed;
+            if (this.passwordRevealed) {
+                this.passwordAcknowledged = true;
+            }
+        },
+
+        copyPassword() {
+            if (!this.protectionPassword) return;
+            navigator.clipboard.writeText(this.protectionPassword)
+                .then(() => {
+                    this.passwordAcknowledged = true;
+                    this.showToastMessage(this.t('Copied to clipboard!'));
+                })
+                .catch(() => {
+                    this.showToastMessage(this.t('Copying failed. Please copy manually.'));
+                });
         },
 
         async generateRandomBytes(length) {
@@ -948,33 +1089,36 @@ export function sniptoComponent() {
         analyzePasswordStrength(pwd) {
             const lowerInput = pwd.toLowerCase();
 
-            // 1. ABSOLUTE FAIL: Match in blacklist
             if (this.passwordBlacklist.includes(lowerInput)) return 0;
 
-            // 2. ABSOLUTE FAIL: Root word match (e.g., "Sunshine88" -> "sunshine")
             const rootWord = lowerInput.replace(/[^a-z]/g, '');
             if (rootWord.length >= 4 && this.passwordBlacklist.includes(rootWord)) return 0;
 
-            // 3. HEURISTIC SCORING
             let score = 0;
+
+            // Length tiers
             if (pwd.length >= 10) score++;
             if (pwd.length >= 14) score++;
             if (pwd.length >= 20) score++;
+            if (pwd.length >= 28) score++;
+            if (pwd.length >= 40) score++;
 
-            // Diversity points
+            // Multi-word structure: 3+ word-like tokens of length ≥3 separated by space, dash, underscore, or dot
+            const tokens = pwd.split(/[\s\-_.]+/).filter(t => t.length >= 3);
+            if (tokens.length >= 3) score += 2;
+            if (tokens.length >= 5) score++;
+
+            // Diversity
             if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
             if (/[0-9]/.test(pwd)) score++;
             if (/[^A-Za-z0-9]/.test(pwd)) score++;
 
-            // 4. PENALTIES
-            // Deduct for predictable endings (e.g., "Password123", "Admin!")
+            // Penalties
             if (/[a-z]{4,}[0-9!@#$%^&*]{1,3}$/i.test(pwd)) score -= 2;
-
-            // Deduct for sequences or repeats
             if (/1234|abcd|qwerty/i.test(pwd)) score -= 2;
-            if (/(\w)\1{2,}/.test(pwd)) score -= 1; // repeating chars like 'aaa'
+            if (/(\w)\1{2,}/.test(pwd)) score -= 1;
 
-            return Math.max(0, score);
+            return Math.max(0, Math.min(5, score));
         },
 
         getCsrfToken() {

@@ -35,7 +35,7 @@ class ApiController extends Controller
      */
     public function show(string $slug, Request $request): JsonResponse
     {
-        $keyHash = $request->input('key_hash');
+        $keyHash = $request->string('key_hash')->toString();
 
         $snipto = Snipto::where('slug', $slug)->first();
 
@@ -84,6 +84,7 @@ class ApiController extends Controller
         if ($snipto->isSniptoId()) {
             $response['sender_public_key'] = $snipto->sender_public_key;
             $response['key_provider_type'] = $snipto->key_provider_type;
+            $response['recipient_salt']    = $snipto->recipient_salt;
         }
 
         // If the key hash is present and valid, add the payload, decrement views and include view_remaining.
@@ -140,6 +141,7 @@ class ApiController extends Controller
             if ($protectionType === ProtectionType::SniptoId) {
                 $rules['sender_public_key'] = ['required', 'string', 'size:44', 'regex:/^[A-Za-z0-9+\/]{43}=$/'];
                 $rules['key_provider_type'] = 'nullable|string|in:passphrase';
+                $rules['recipient_salt']    = ['required', 'string', 'size:24', 'regex:/^[A-Za-z0-9+\/]{22}==$/'];
             }
         } else {
             $rules['payload'] = [

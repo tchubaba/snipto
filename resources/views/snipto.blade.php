@@ -1,6 +1,8 @@
 @extends('layouts.main')
 
 @section('header-js')
+    @vite(['resources/js/sodium-bundle.js'])
+    <script src="{{ asset('build/js/wordlist.js') }}?v={{ file_exists(public_path('build/js/wordlist.js')) ? filemtime(public_path('build/js/wordlist.js')) : '0' }}"></script>
     <script type="module" src="{{ asset('build/js/snipto.js') }}?v={{ filemtime(public_path('build/js/snipto.js')) }}"></script>
 @endsection
 
@@ -38,13 +40,14 @@
                 'Use anyway' => __('Use anyway'),
                 'Please enter a Snipto ID.' => __('Please enter a Snipto ID.'),
                 'Invalid Snipto ID format.' => __('Invalid Snipto ID format.'),
-                'This snippet was sent to a Snipto ID.' => __('This snippet was sent to a Snipto ID.'),
-                'Enter your passphrase to generate your Snipto ID and decrypt.' => __('Enter your passphrase to generate your Snipto ID and decrypt.'),
+                'This snippet was sent to your Snipto ID.' => __('This snippet was sent to your Snipto ID.'),
+                'Enter your passphrase to decrypt it.' => __('Enter your passphrase to decrypt it.'),
                 'Decrypt' => __('Decrypt'),
                 'Decryption failed. Please check your passphrase and try again.' => __('Decryption failed. Please check your passphrase and try again.'),
-                'Passphrase must be at least 16 characters.' => __('Passphrase must be at least 16 characters.'),
+                'Passphrase must be at least 20 characters.' => __('Passphrase must be at least 20 characters.'),
                 'Your browser does not support this feature. Please update your browser.' => __('Your browser does not support this feature. Please update your browser.'),
-                'You have been temporarily locked out. Please check back later.' => __('You have been temporarily locked out. Please check back later.')
+                'You have been temporarily locked out. Please check back later.' => __('You have been temporarily locked out. Please check back later.'),
+                'Reveal or copy your passphrase first.' => __('Reveal or copy your passphrase first.'),
             ]);
         @endphp
     </script>
@@ -170,10 +173,10 @@
                         </svg>
                     </div>
                     <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                        {!! __('This snippet was sent to a Snipto ID.') !!}
+                        {!! __('This snippet was sent to your Snipto ID.') !!}
                     </h3>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                        {!! __('Enter your passphrase to generate your Snipto ID and decrypt.') !!}
+                        {!! __('Enter your passphrase to decrypt it.') !!}
                     </p>
                 </div>
 
@@ -227,7 +230,7 @@
                             </button>
 
                             <!-- Mode 3: Snipto ID -->
-                            <button x-show="x25519Supported" @click="protectionType = 3"
+                            <button x-show="cryptoSupported" @click="protectionType = 3"
                                     :class="protectionType === 3 ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
                                     class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200">
                                 {{ __('Snipto ID') }}
@@ -294,10 +297,38 @@
                                     </div>
                                 </div>
 
-                                <input type="password" x-model="protectionPassword" 
-                                       x-ref="protectionPasswordField"
-                                       placeholder="{{ __('Enter a password to protect this snippet (min 8 chars)') }}"
-                                       class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
+                                <div class="relative">
+                                    <input :type="passwordRevealed ? 'text' : 'password'" x-model="protectionPassword"
+                                           @input="onPasswordInput()"
+                                           x-ref="protectionPasswordField"
+                                           placeholder="{{ __('Enter a password to protect this snippet (min 8 chars)') }}"
+                                           class="w-full border rounded-lg p-3 pr-24 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 space-x-1">
+                                        <button type="button" @click="togglePasswordReveal()"
+                                                x-show="protectionPassword.length > 0"
+                                                :title="passwordRevealed ? '{{ __('Hide') }}' : '{{ __('Show') }}'"
+                                                class="p-1 text-gray-400 hover:text-indigo-500">
+                                            <svg x-show="!passwordRevealed" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            <svg x-show="passwordRevealed" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3l18 18M10.584 10.587a2 2 0 002.828 2.83M9.363 5.365A9.466 9.466 0 0112 5c4.477 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411M6.1 6.1A10.025 10.025 0 002.458 12C3.732 16.057 7.523 19 12 19c1.66 0 3.227-.405 4.6-1.122"/></svg>
+                                        </button>
+                                        <button type="button" @click="copyPassword()"
+                                                x-show="protectionPassword.length > 0"
+                                                :title="'{{ __('Copy') }}'"
+                                                class="p-1 text-gray-400 hover:text-indigo-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex justify-between items-center text-xs mt-1">
+                                    <button type="button" @click="generatePassword()"
+                                            class="text-indigo-500 hover:underline">
+                                        {{ __('Generate for me') }}
+                                    </button>
+                                    <span x-show="passwordGenerated && !passwordAcknowledged" x-cloak
+                                          class="text-orange-500 dark:text-orange-400">
+                                        {{ __('Reveal or copy your passphrase first.') }}
+                                    </span>
+                                </div>
                             </div>
 
                             <!-- Snipto ID Input -->

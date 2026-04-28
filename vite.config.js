@@ -20,6 +20,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/js/app.js',
+                'resources/js/sodium-bundle.js',
             ],
             refresh: true,
         }),
@@ -34,6 +35,10 @@ export default defineConfig({
                     src: 'resources/js/sniptoid.js',
                     dest: 'js',
                 },
+                {
+                    src: 'resources/js/wordlist.js',
+                    dest: 'js',
+                },
             ],
         }),
     ],
@@ -44,5 +49,6 @@ export default defineConfig({
             },
         },
         minify: 'esbuild',
+        chunkSizeWarningLimit: 600,
     },
 });
