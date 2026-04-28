@@ -6,10 +6,18 @@ Snipto lets you share text snippets via single-use URLs. Content is encrypted in
 
 - End-to-end encrypted (AES-256-GCM client-side; key never touches the server)
 - Three protection modes: random link-key, password, or asymmetric **Snipto ID** (X25519 ECDH)
+- Memory-hard key derivation (Argon2id) for password and Snipto ID modes
+- Built-in diceware passphrase generator with reveal/copy gate
 - Single-use, auto-expiring (1 hour default; up to 1 week for password / Snipto ID)
 - QR codes for mobile sharing
 - Strict CSP, Trusted Types, sandboxed iframe rendering, COOP/COEP/CORP isolation
 - Self-contained image — no internet access required at runtime
+
+### Protection modes
+
+- **URL Secret** — random AES-256-GCM key embedded in the URL fragment (`#k=…`). Never sent to the server.
+- **Password** — recipient enters a shared password. Argon2id (64 MB, t=3) → HKDF-SHA256 → separate AES-GCM and HMAC keys.
+- **Snipto ID** — publish a 64-character ID derived from your passphrase via X25519 + Argon2id. Senders encrypt to your public key; only your passphrase can decrypt. Private keys are never stored or transmitted — re-derived in the browser on demand.
 
 Built on Laravel 13, PHP 8.5, Alpine.js (CSP build), Tailwind CSS 4.
 
