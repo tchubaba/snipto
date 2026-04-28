@@ -59,6 +59,7 @@ export function sniptoComponent() {
         senderPublicKey: null,
         keyProviderType: null,
         recipientSalt: null,
+        sniptoIdPrefix: '',
         showSniptoIdPrompt: false,
         passwordRevealed: false,
         passwordAcknowledged: false,
@@ -145,6 +146,15 @@ export function sniptoComponent() {
                     this.senderPublicKey = data.sender_public_key;
                     this.keyProviderType = data.key_provider_type;
                     this.recipientSalt   = data.recipient_salt;
+                    // First 8 chars of the recipient's full Snipto ID = base64 of the salt's
+                    // first 6 bytes (base64 encodes 3 bytes per 4 chars, so 6 bytes → 8 chars,
+                    // no padding, and these chars depend only on salt — not pubkey).
+                    try {
+                        const saltBytes = this.base64ToBytes(this.recipientSalt);
+                        this.sniptoIdPrefix = this.bytesToBase64(saltBytes.slice(0, 6)).replace(/=+$/, '');
+                    } catch {
+                        this.sniptoIdPrefix = '';
+                    }
                     this.showSniptoIdPrompt = true;
                 }
             } catch {
@@ -1123,6 +1133,21 @@ export function sniptoComponent() {
 
         getCsrfToken() {
             return document.querySelector('meta[name="csrf-token"]').content;
+        },
+
+        // Split the Snipto-ID heading translation around the `:prefix` placeholder so the
+        // prefix can be rendered in its own <strong> via x-text. We can't use x-html here
+        // because CSP enforces require-trusted-types-for 'script'.
+        sniptoIdHeadingBefore() {
+            const tpl = this.t('This snippet was sent to a Snipto ID starting with :prefix.');
+            const idx = tpl.indexOf(':prefix');
+            return idx === -1 ? tpl : tpl.slice(0, idx);
+        },
+
+        sniptoIdHeadingAfter() {
+            const tpl = this.t('This snippet was sent to a Snipto ID starting with :prefix.');
+            const idx = tpl.indexOf(':prefix');
+            return idx === -1 ? '' : tpl.slice(idx + ':prefix'.length);
         },
 
         t(englishKey, replacements = []) {

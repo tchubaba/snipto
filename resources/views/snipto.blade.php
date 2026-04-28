@@ -40,7 +40,7 @@
                 'Use anyway' => __('Use anyway'),
                 'Please enter a Snipto ID.' => __('Please enter a Snipto ID.'),
                 'Invalid Snipto ID format.' => __('Invalid Snipto ID format.'),
-                'This snippet was sent to your Snipto ID.' => __('This snippet was sent to your Snipto ID.'),
+                'This snippet was sent to a Snipto ID starting with :prefix.' => __('This snippet was sent to a Snipto ID starting with :prefix.'),
                 'Enter your passphrase to decrypt it.' => __('Enter your passphrase to decrypt it.'),
                 'Decrypt' => __('Decrypt'),
                 'Decryption failed. Please check your passphrase and try again.' => __('Decryption failed. Please check your passphrase and try again.'),
@@ -173,7 +173,7 @@
                         </svg>
                     </div>
                     <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
-                        {!! __('This snippet was sent to your Snipto ID.') !!}
+                        <span x-text="sniptoIdHeadingBefore()"></span><strong class="font-bold" x-text="sniptoIdPrefix"></strong><span x-text="sniptoIdHeadingAfter()"></span>
                     </h3>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                         {!! __('Enter your passphrase to decrypt it.') !!}

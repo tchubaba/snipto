@@ -146,7 +146,7 @@
     "Get your Snipto ID": "Holen Sie sich Ihre Snipto-ID",
     "Generate Snipto ID": "Snipto-ID generieren",
     "Recipient's Snipto ID": "Snipto-ID des Empfängers",
-    "This snippet was sent to your Snipto ID.": "Dieser Snipto wurde an Ihre Snipto-ID gesendet.",
+    "This snippet was sent to a Snipto ID starting with :prefix.": "Dieser Snipto wurde an eine Snipto-ID gesendet, die mit :prefix beginnt.",
     "Enter your passphrase to decrypt it.": "Geben Sie Ihre Passphrase ein, um ihn zu entschlüsseln.",
     "Enter your passphrase": "Geben Sie Ihre Passphrase ein",
     "Decrypt": "Entschlüsseln",
