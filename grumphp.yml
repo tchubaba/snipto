@@ -15,5 +15,10 @@ grumphp:
       testsuite: ~
       group: []
       always_execute: true
+    shell:
+      scripts:
+        - ['-c', 'composer audit --no-interaction']
+        - ['-c', 'npm audit --audit-level=moderate']
+      triggered_by: [json, lock]
   testsuites: []
   extensions: []
