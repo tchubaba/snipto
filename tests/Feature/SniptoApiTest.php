@@ -290,6 +290,36 @@ class SniptoApiTest extends TestCase
     }
 
     #[Test]
+    public function it_returns_nonce_pre_auth_for_password_protected_snippet()
+    {
+        $nonce   = bin2hex(random_bytes(12));
+        $keyHash = hash('sha256', 'irrelevant');
+
+        Snipto::create([
+            'slug'            => 'pwd-slug',
+            'payload'         => base64_encode('encrypted-data'),
+            'nonce'           => $nonce,
+            'key_hash'        => $keyHash,
+            'protection_type' => ProtectionType::Password,
+            'expires_at'      => Carbon::now()->addHour(),
+            'views_remaining' => 1,
+        ]);
+
+        // Pre-auth GET (no key_hash) returns the nonce so the client can run Argon2id+HKDF
+        // to produce the key_hash on its end before requesting the payload.
+        $response = $this->getJson('/api/snipto/pwd-slug');
+        $response->assertStatus(200)
+            ->assertJson([
+                'protection_type' => ProtectionType::Password->value,
+                'nonce'           => $nonce,
+            ])
+            ->assertJsonMissing(['payload']);
+
+        // Snipto must not have been consumed by the metadata fetch.
+        $this->assertDatabaseHas('sniptos', ['slug' => 'pwd-slug']);
+    }
+
+    #[Test]
     public function it_allows_snipto_id_with_custom_expiration()
     {
         $nonce         = bin2hex(random_bytes(12));

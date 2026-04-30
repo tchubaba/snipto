@@ -27,7 +27,7 @@
                 'Enter password' => __('Enter password'),
                 'Invalid password. Please try again.' => __('Invalid password. Please try again.'),
                 'This snippet is unavailable or the link is invalid.' => __('This snippet is unavailable or the link is invalid.'),
-                'Password must be at least 8 characters long.' => __('Password must be at least 8 characters long.'),
+                'Password must be at least 12 characters long.' => __('Password must be at least 12 characters long.'),
                 'You attempted too many times. Please try again in :seconds seconds.' => __('You attempted too many times. Please try again in :seconds seconds.'),
                 'Expire after:' => __('Expire after:'),
                 '1 Hour' => __('1 Hour'),
@@ -301,7 +301,7 @@
                                     <input :type="passwordRevealed ? 'text' : 'password'" x-model="protectionPassword"
                                            @input="onPasswordInput()"
                                            x-ref="protectionPasswordField"
-                                           placeholder="{{ __('Enter a password to protect this snippet (min 8 chars)') }}"
+                                           placeholder="{{ __('Enter a password to protect this snippet (min 12 chars)') }}"
                                            class="w-full border rounded-lg p-3 pr-24 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
                                     <div class="absolute inset-y-0 right-0 flex items-center pr-2 space-x-1">
                                         <button type="button" @click="togglePasswordReveal()"

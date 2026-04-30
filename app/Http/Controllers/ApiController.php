@@ -87,6 +87,13 @@ class ApiController extends Controller
             $response['recipient_salt']    = $snipto->recipient_salt;
         }
 
+        // Password mode derives key_hash from Argon2id(password, ...nonce-derived salt...).
+        // The recipient needs the nonce to reproduce the derivation before it can present
+        // a valid key_hash, so it is exposed pre-auth. The nonce is an IV/salt, not a secret.
+        if ($snipto->isPasswordProtected()) {
+            $response['nonce'] = $snipto->nonce;
+        }
+
         // If the key hash is present and valid, add the payload, decrement views and include view_remaining.
         if ( ! empty($keyHash)) {
             $response['payload']         = $snipto->payload;
