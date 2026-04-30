@@ -869,7 +869,7 @@ export function sniptoComponent() {
             );
 
             const hkdfKey = await crypto.subtle.importKey(
-                'raw', master, 'HKDF', false, ['deriveKey']
+                'raw', master, 'HKDF', false, ['deriveKey', 'deriveBits']
             );
             master.fill(0);
 

@@ -64,6 +64,7 @@ export function sniptoComponent() {
         passwordRevealed: false,
         passwordAcknowledged: false,
         passwordGenerated: false,
+        passwordNonceHex: null,
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
@@ -139,7 +140,9 @@ export function sniptoComponent() {
                     }
                     await this.retrieveAndDecrypt(shortSecretBytes);
                 } else if (this.protectionType === 2) {
-                    // Mode 2: Password
+                    // Mode 2: Password — nonce is returned pre-auth so the client can
+                    // reproduce the Argon2id+HKDF derivation that produces key_hash.
+                    this.passwordNonceHex = data.nonce;
                     this.showPasswordPrompt = true;
                 } else if (this.protectionType === 3) {
                     // Mode 3: Snipto ID (Asymmetric)
@@ -178,9 +181,9 @@ export function sniptoComponent() {
             }
         },
 
-        async retrieveAndDecrypt(secretBytes) {
+        async retrieveAndDecrypt(secretBytes, preDerived = null) {
             try {
-                const secretHash = await this.sha256Hex(secretBytes);
+                const secretHash = preDerived ? preDerived.secretHash : await this.sha256Hex(secretBytes);
                 const res = await fetch(`/api/snipto/${this.slug}?key_hash=${secretHash}`, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
@@ -202,13 +205,14 @@ export function sniptoComponent() {
                 if (!res.ok) throw new Error();
 
                 const data = await res.json();
-                this.nonce = this.hexToBytes(data.nonce);
-                const { encKey, hmacKey } = this.protectionType === 2
-                    ? await this.deriveKeysFromPassword(secretBytes, data.nonce)
-                    : await this.deriveKeys(secretBytes, data.nonce);
+                const nonceHex = preDerived ? preDerived.nonceHex : data.nonce;
+                this.nonce = this.hexToBytes(nonceHex);
+                const { encKey, hmacKey } = preDerived
+                    ? preDerived
+                    : await this.deriveKeys(secretBytes, nonceHex);
 
                 const payloadBytes = this.base64ToBytes(data.payload);
-                const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, this.nonce, hmacKey, data.nonce);
+                const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, this.nonce, hmacKey, nonceHex);
                 const decryptedBytes = new Uint8Array(decryptedBuffer);
 
                 this.showPayload = true;
@@ -226,13 +230,24 @@ export function sniptoComponent() {
 
         async unlockWithPassword() {
             if (!this.protectionPassword.trim()) return;
+            if (!this.passwordNonceHex) {
+                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
+                return;
+            }
             this.loading = true;
 
             const pwdBytes = new TextEncoder().encode(this.protectionPassword);
-            await this.retrieveAndDecrypt(pwdBytes);
-
+            const { encKey, hmacKey, keyHash } = await this.deriveKeysFromPassword(pwdBytes, this.passwordNonceHex);
             pwdBytes.fill(0);
             this.protectionPassword = '';
+
+            await this.retrieveAndDecrypt(null, {
+                secretHash: keyHash,
+                encKey,
+                hmacKey,
+                nonceHex: this.passwordNonceHex,
+            });
+
             this.loading = false;
         },
 
@@ -434,8 +449,8 @@ export function sniptoComponent() {
 
             // Validation: Password length
             if (finalProtectionType === 2) {
-                if (this.protectionPassword.length < 8) {
-                    this.showToastMessage(this.t('Password must be at least 8 characters long.'));
+                if (this.protectionPassword.length < 12) {
+                    this.showToastMessage(this.t('Password must be at least 12 characters long.'));
                     return;
                 }
 
@@ -476,15 +491,17 @@ export function sniptoComponent() {
                 nonceHex = await this.generateRandomBytes(12);
                 this.nonce = this.hexToBytes(nonceHex);
 
-                const { encKey, hmacKey } = finalProtectionType === 2
+                const derived = finalProtectionType === 2
                     ? await this.deriveKeysFromPassword(secretBytes, nonceHex)
                     : await this.deriveKeys(secretBytes, nonceHex);
-                this.key = encKey;
-                this.hmacKey = hmacKey;
+                this.key = derived.encKey;
+                this.hmacKey = derived.hmacKey;
 
                 const userInputBytes = new TextEncoder().encode(this.userInput);
                 payloadToSend = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
-                secretHash = await this.sha256Hex(secretBytes);
+                secretHash = finalProtectionType === 2
+                    ? derived.keyHash
+                    : await this.sha256Hex(secretBytes);
 
                 // Clean up sensitive bytes
                 userInputBytes.fill(0);
@@ -852,7 +869,7 @@ export function sniptoComponent() {
             );
 
             const hkdfKey = await crypto.subtle.importKey(
-                'raw', master, 'HKDF', false, ['deriveKey']
+                'raw', master, 'HKDF', false, ['deriveKey', 'deriveBits']
             );
             master.fill(0);
 
@@ -874,7 +891,18 @@ export function sniptoComponent() {
                 ['sign', 'verify']
             );
 
-            return { encKey, hmacKey };
+            // key_hash shares the Argon2id master via a third HKDF label so the server-side
+            // authorization token is itself memory-hard — cracking it costs the same as
+            // cracking the ciphertext, closing the unsalted-SHA-256 weak link.
+            const keyHashBits = await crypto.subtle.deriveBits(
+                { name: 'HKDF', hash: 'SHA-256', salt: hkdfSalt, info: enc.encode('key-hash') },
+                hkdfKey,
+                256
+            );
+            const keyHash = Array.from(new Uint8Array(keyHashBits))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+
+            return { encKey, hmacKey, keyHash };
         },
 
         async encryptPayload(plainBytes, encKey, nonce, hmacKey, nonceHex) {
