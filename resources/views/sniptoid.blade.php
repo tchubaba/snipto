@@ -1,3 +1,4 @@
+@php use App\Support\Snipto\Passphrase; @endphp
 @extends('layouts.main')
 
 @section('header-js')
@@ -16,7 +17,7 @@
                 'Copying failed. Please copy manually.' => __('Copying failed. Please copy manually.'),
                 'Generate Snipto ID' => __('Generate Snipto ID'),
                 'Enter a passphrase to generate your Snipto ID' => __('Enter a passphrase to generate your Snipto ID'),
-                'Passphrase must be at least 16 characters.' => __('Passphrase must be at least 16 characters.'),
+                'Passphrase must be at least :count characters.' => __('Passphrase must be at least :count characters.', ['count' => Passphrase::MIN_LENGTH]),
                 'Your browser does not support this feature. Please update your browser.' => __('Your browser does not support this feature. Please update your browser.'),
                 'Failed to generate Snipto ID. Please try again.' => __('Failed to generate Snipto ID. Please try again.'),
                 'Weak — easy to crack' => __('Weak — easy to crack'),
@@ -38,7 +39,7 @@
     <div class="max-w-xl w-full rounded-xl p-6 space-y-6
             shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
             transition-colors duration-300"
-         x-data="sniptoidComponent()"
+         x-data="sniptoidComponent({{ Passphrase::MIN_LENGTH }})"
          x-init="init()">
 
         <!-- Browser Support Warning -->
@@ -69,7 +70,7 @@
                         <input :type="passphraseRevealed ? 'text' : 'password'" x-model="passphrase"
                                @input="onPassphraseInput()"
                                @keydown.enter="deriveSniptoid()"
-                               placeholder="{{ __('Enter a passphrase (min 16 characters)') }}"
+                               placeholder="{{ __('Enter a passphrase (min :count characters)', ['count' => Passphrase::MIN_LENGTH]) }}"
                                class="w-full border rounded-lg p-3 pr-24 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
                         <div class="absolute inset-y-0 right-0 flex items-center pr-2 space-x-1">
                             <button type="button" @click="togglePassphraseReveal()"
@@ -93,14 +94,14 @@
                             {{ __('Generate for me') }}
                         </button>
                         <span class="text-gray-400 dark:text-gray-500"
-                              :class="passphrase.length >= 20 ? 'text-green-500 dark:text-green-400' : ''">
-                            <span x-text="passphrase.length"></span> / 20 {{ __('characters minimum') }}
+                              :class="passphrase.length >= minPassphraseLength ? 'text-green-500 dark:text-green-400' : ''">
+                            <span x-text="passphrase.length"></span> / <span x-text="minPassphraseLength"></span> {{ __('characters minimum') }}
                         </span>
                     </div>
                     <p class="text-xs text-gray-400 dark:text-gray-500">
                         {{ __('Use 6+ random words or a long unique phrase — not a password you reuse.') }}
                     </p>
-                    <div x-show="passphrase.length >= 20" x-cloak class="mt-1">
+                    <div x-show="passphrase.length >= minPassphraseLength" x-cloak class="mt-1">
                         <div class="flex gap-1 h-1">
                             <div class="flex-1 rounded-full transition-colors duration-300"
                                  :class="passphraseStrength() >= 1 ? 'bg-red-400' : 'bg-gray-200 dark:bg-gray-700'"></div>
@@ -125,7 +126,7 @@
                 </div>
 
                 <button @click="deriveSniptoid()"
-                        :disabled="loading || passphrase.length < 20 || (passphraseGenerated && !passphraseAcknowledged)"
+                        :disabled="loading || passphrase.length < minPassphraseLength || (passphraseGenerated && !passphraseAcknowledged)"
                         class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                     <span x-show="!loading">{!! __('Generate Snipto ID') !!}</span>
                     <span x-show="loading" x-cloak class="flex items-center justify-center space-x-2">

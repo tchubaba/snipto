@@ -19,7 +19,7 @@ async function supportsArgon2id() {
     }
 }
 
-export function sniptoidComponent() {
+export function sniptoidComponent(minPassphraseLength = 20) {
     return {
         passphrase: '',
         sniptoId: null,
@@ -30,6 +30,7 @@ export function sniptoidComponent() {
         passphraseRevealed: false,
         passphraseAcknowledged: false,
         passphraseGenerated: false,
+        minPassphraseLength,
 
         async init() {
             const [x25519Ok, argon2Ok] = await Promise.all([supportsX25519(), supportsArgon2id()]);
@@ -39,8 +40,8 @@ export function sniptoidComponent() {
         async deriveSniptoid() {
             if (!this.passphrase.trim()) return;
 
-            if (this.passphrase.length < 16) {
-                this.showToastMessage(this.t('Passphrase must be at least 16 characters.'));
+            if (this.passphrase.length < this.minPassphraseLength) {
+                this.showToastMessage(this.t('Passphrase must be at least :count characters.', { ':count': this.minPassphraseLength }));
                 return;
             }
 
@@ -171,7 +172,7 @@ export function sniptoidComponent() {
         },
 
         passphraseStrength() {
-            if (this.passphrase.length < 20) return 0;
+            if (this.passphrase.length < this.minPassphraseLength) return 0;
             return this.analyzePasswordStrength(this.passphrase);
         },
 
