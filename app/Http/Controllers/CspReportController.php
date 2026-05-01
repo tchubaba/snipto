@@ -15,53 +15,101 @@ class CspReportController extends Controller
     /**
      * Handles a Content Security Policy (CSP) violation report.
      *
-     * This method validates the incoming request to ensure it contains
-     * a valid CSP report payload. The payload is then checked against
-     * defined validation rules. If any validation errors occur, an error
-     * response is returned. Valid CSP violations are logged using a
-     * specific log channel.
+     * Accepts both report formats browsers may send:
+     *   - Legacy `report-uri` directive: Content-Type `application/csp-report`,
+     *     body `{"csp-report": {...kebab-case fields...}}`.
+     *   - Modern Reporting API (`report-to` directive): Content-Type
+     *     `application/reports+json`, body `[{"type": "csp-violation",
+     *     "body": {...camelCase fields...}}, ...]` (an array of reports).
+     *
+     * Both shapes are normalized to a single canonical kebab-case form before
+     * validation and logging. Field validation is intentionally permissive:
+     * we want to log partial or unusual reports rather than reject them, since
+     * CSP reports are noisy by nature (browser extensions, edge proxies,
+     * inline anti-bot scripts) and a missing field is no reason to drop the
+     * signal.
      *
      * @param  Request  $request  The HTTP request instance containing the CSP report payload.
-     * @return Response|JsonResponse Returns a no-content response for successful processing
-     *                               or a JSON response containing error details if validation fails.
+     * @return Response|JsonResponse 204 on success, 400 when the body shape is unrecognizable.
      */
     public function report(Request $request): Response|JsonResponse
     {
-        // Validate content type
-        if ($request->header('Content-Type') !== 'application/csp-report') {
+        $contentType = $request->header('Content-Type', '');
+        $reports     = [];
+
+        if (str_contains($contentType, 'application/csp-report')) {
+            $payload = $request->json()->all();
+            if (isset($payload['csp-report']) && is_array($payload['csp-report'])) {
+                $reports[] = $payload['csp-report'];
+            }
+        } elseif (str_contains($contentType, 'application/reports+json')) {
+            $payload = $request->json()->all();
+            foreach ((is_array($payload) ? $payload : []) as $entry) {
+                if ( ! is_array($entry) || ($entry['type'] ?? '') !== 'csp-violation') {
+                    continue;
+                }
+                if (isset($entry['body']) && is_array($entry['body'])) {
+                    $reports[] = $this->normalizeReportingApi($entry['body']);
+                }
+            }
+        } else {
             return response()->json(['error' => 'Invalid content type'], 400);
         }
 
-        $payload = $request->json()->all();
-
-        // Define validation rules
-        $validator = Validator::make($payload, [
-            'csp-report' => ['required', 'array'], // top-level object
-
-            // Nested keys
-            'csp-report.blocked-uri'         => ['required', 'string'],
-            'csp-report.column-number'       => ['nullable', 'integer', 'min:0'],
-            'csp-report.disposition'         => ['string', 'in:enforce,report'],
-            'csp-report.document-uri'        => ['required', 'url', 'starts_with:'.config('app.url')],
-            'csp-report.effective-directive' => ['required', 'string'],
-            'csp-report.line-number'         => ['nullable', 'integer', 'min:0'],
-            'csp-report.original-policy'     => ['required', 'string'],
-            'csp-report.referrer'            => ['nullable', 'string'],
-            'csp-report.source-file'         => ['nullable', 'string'],
-            'csp-report.status-code'         => ['required', 'integer', 'max:599'],
-            'csp-report.violated-directive'  => ['required', 'string'],
-        ]);
-
-        // Check for validation errors
-        if ($validator->fails()) {
-            Log::channel('csp')->error('Invalid CSP report', $validator->errors()->all());
-
+        if ($reports === []) {
             return response()->json(['error' => 'Invalid CSP report'], 400);
         }
 
-        // Log valid report
-        Log::channel('csp')->warning('CSP Violation', $payload['csp-report']);
+        foreach ($reports as $report) {
+            $validator = Validator::make($report, [
+                'blocked-uri'         => ['nullable', 'string'],
+                'document-uri'        => ['nullable', 'string'],
+                'effective-directive' => ['nullable', 'string'],
+                'violated-directive'  => ['nullable', 'string'],
+                'original-policy'     => ['nullable', 'string'],
+                'source-file'         => ['nullable', 'string'],
+                'line-number'         => ['nullable', 'integer', 'min:0'],
+                'column-number'       => ['nullable', 'integer', 'min:0'],
+                'status-code'         => ['nullable', 'integer', 'between:0,599'],
+                'disposition'         => ['nullable', 'string', 'in:enforce,report'],
+                'referrer'            => ['nullable', 'string'],
+                'sample'              => ['nullable', 'string'],
+            ]);
+
+            if ($validator->fails()) {
+                Log::channel('csp')->error('Invalid CSP report fields', [
+                    'errors' => $validator->errors()->all(),
+                    'report' => $report,
+                ]);
+
+                continue;
+            }
+
+            Log::channel('csp')->warning('CSP Violation', $report);
+        }
 
         return response()->noContent();
+    }
+
+    /**
+     * Map Reporting-API camelCase fields onto our canonical kebab-case shape so
+     * both legacy and modern reports validate and log identically.
+     */
+    private function normalizeReportingApi(array $body): array
+    {
+        return [
+            'blocked-uri'         => $body['blockedURL'] ?? null,
+            'document-uri'        => $body['documentURL'] ?? null,
+            'effective-directive' => $body['effectiveDirective'] ?? null,
+            'violated-directive'  => $body['effectiveDirective'] ?? null,
+            'original-policy'     => $body['originalPolicy'] ?? null,
+            'source-file'         => $body['sourceFile'] ?? null,
+            'line-number'         => $body['lineNumber'] ?? null,
+            'column-number'       => $body['columnNumber'] ?? null,
+            'status-code'         => $body['statusCode'] ?? null,
+            'disposition'         => $body['disposition'] ?? null,
+            'referrer'            => $body['referrer'] ?? null,
+            'sample'              => $body['sample'] ?? null,
+        ];
     }
 }
