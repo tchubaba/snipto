@@ -8,7 +8,7 @@ EXEC = $(DC) exec app
 ARTISAN = $(EXEC) php artisan
 
 # Targets
-.PHONY: up down build restart artisan composer npm shell test grumphp fix logs fresh
+.PHONY: up down build restart artisan composer npm shell test grumphp fix lint logs fresh
 
 up:
 	$(DC) up -d
@@ -44,6 +44,9 @@ grumphp:
 
 fix:
 	$(EXEC) ./vendor/bin/php-cs-fixer --config=.php-cs-fixer.php fix
+
+lint:
+	$(EXEC) ./vendor/bin/php-cs-fixer --config=.php-cs-fixer.php fix --dry-run --diff
 
 logs:
 	$(DC) logs -f app
