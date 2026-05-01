@@ -43,7 +43,7 @@ grumphp:
 	$(EXEC) ./vendor/bin/grumphp run
 
 fix:
-	$(EXEC) ./vendor/bin/pint
+	$(EXEC) ./vendor/bin/php-cs-fixer --config=.php-cs-fixer.php fix
 
 logs:
 	$(DC) logs -f app
