@@ -1,19 +1,10 @@
-// Feature detection for X25519 Web Crypto support
-async function supportsX25519() {
-    try {
-        await crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveKey', 'deriveBits']);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-// Feature detection for Argon2id (via libsodium.js / WebAssembly)
-async function supportsArgon2id() {
+// Feature detection for libsodium (Argon2id + X25519 via WebAssembly)
+async function supportsLibsodium() {
     try {
         if (typeof WebAssembly === 'undefined' || typeof window.sodium === 'undefined') return false;
         await window.sodium.ready;
-        return typeof window.sodium.crypto_pwhash === 'function';
+        return typeof window.sodium.crypto_pwhash === 'function'
+            && typeof window.sodium.crypto_scalarmult_base === 'function';
     } catch {
         return false;
     }
@@ -33,8 +24,7 @@ export function sniptoidComponent(minPassphraseLength = 20) {
         minPassphraseLength,
 
         async init() {
-            const [x25519Ok, argon2Ok] = await Promise.all([supportsX25519(), supportsArgon2id()]);
-            this.cryptoSupported = x25519Ok && argon2Ok;
+            this.cryptoSupported = await supportsLibsodium();
         },
 
         async deriveSniptoid() {
@@ -68,7 +58,8 @@ export function sniptoidComponent(minPassphraseLength = 20) {
                 this.passphraseGenerated = false;
                 this.passphraseAcknowledged = false;
                 this.passphraseRevealed = false;
-            } catch {
+            } catch (err) {
+                console.error('Snipto ID derivation failed:', err);
                 this.showToastMessage(this.t('Failed to generate Snipto ID. Please try again.'));
             } finally {
                 this.loading = false;
@@ -125,6 +116,8 @@ export function sniptoidComponent(minPassphraseLength = 20) {
 
         // SYNC: deriveX25519KeyPair is also in snipto.js — the derivation block must match byte-for-byte.
         // `salt` is a 16-byte Uint8Array supplied by the caller (per-Snipto-ID random in v3).
+        // libsodium-only: WebCrypto's exportKey('jwk') for X25519 is blocked under
+        // privacy.resistFingerprinting in Tor/Mullvad (Firefox ESR). Same algorithm, same outputs.
         async deriveX25519KeyPair(passphrase, salt) {
             await sodium.ready;
             const rawPrivateBytes = sodium.crypto_pwhash(
@@ -136,26 +129,10 @@ export function sniptoidComponent(minPassphraseLength = 20) {
                 sodium.crypto_pwhash_ALG_ARGON2ID13
             );
 
-            // PKCS8 wrapper for X25519: fixed 16-byte ASN.1 header + 32-byte private key
-            const pkcs8Header = new Uint8Array([
-                0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06,
-                0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20
-            ]);
-            const pkcs8 = new Uint8Array(48);
-            pkcs8.set(pkcs8Header);
-            pkcs8.set(rawPrivateBytes, 16);
+            const publicKeyBytes = sodium.crypto_scalarmult_base(rawPrivateBytes);
+            const publicKeyBase64 = this.bytesToBase64(publicKeyBytes);
 
-            const privateKey = await crypto.subtle.importKey(
-                'pkcs8', pkcs8, { name: 'X25519' }, true, ['deriveBits']
-            );
-
-            // Export to JWK to obtain the public key
-            const jwk = await crypto.subtle.exportKey('jwk', privateKey);
-            const publicKeyBase64 = jwk.x.replace(/-/g, '+').replace(/_/g, '/') + '=';
-
-            // Clean up sensitive material
-            rawPrivateBytes.fill(0);
-            pkcs8.fill(0);
+            sodium.memzero(rawPrivateBytes);
 
             return { publicKeyBase64 };
         },

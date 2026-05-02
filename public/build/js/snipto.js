@@ -1,25 +1,19 @@
-// Feature detection for X25519 Web Crypto support
-async function supportsX25519() {
-    try {
-        await crypto.subtle.generateKey({ name: 'X25519' }, true, ['deriveKey', 'deriveBits']);
-        return true;
-    } catch {
-        return false;
-    }
-}
-window.supportsX25519 = supportsX25519;
-
-// Feature detection for Argon2id (via libsodium.js / WebAssembly)
-async function supportsArgon2id() {
+// Feature detection for libsodium (Argon2id + X25519 via WebAssembly).
+// X25519 is performed via libsodium rather than WebCrypto because Firefox-based
+// privacy browsers (Tor, Mullvad) block crypto.subtle.exportKey('jwk', ...) for
+// X25519 under privacy.resistFingerprinting. Same algorithm, same outputs.
+async function supportsLibsodium() {
     try {
         if (typeof WebAssembly === 'undefined' || typeof window.sodium === 'undefined') return false;
         await window.sodium.ready;
-        return typeof window.sodium.crypto_pwhash === 'function';
+        return typeof window.sodium.crypto_pwhash === 'function'
+            && typeof window.sodium.crypto_scalarmult === 'function'
+            && typeof window.sodium.crypto_scalarmult_base === 'function';
     } catch {
         return false;
     }
 }
-window.supportsArgon2id = supportsArgon2id;
+window.supportsLibsodium = supportsLibsodium;
 
 export function sniptoComponent() {
     return {
@@ -82,8 +76,7 @@ export function sniptoComponent() {
                 document.documentElement.classList.add('dark');
             }
 
-            const [x25519Ok, argon2Ok] = await Promise.all([supportsX25519(), supportsArgon2id()]);
-            this.cryptoSupported = x25519Ok && argon2Ok;
+            this.cryptoSupported = await supportsLibsodium();
 
             if (!this.slug) {
                 this.showForm = true;
@@ -527,19 +520,17 @@ export function sniptoComponent() {
                 const recipientPubkeyBase64 = this.bytesToBase64(recipientPubkeyBytes); // 44 chars with '='
                 recipientSaltBase64 = this.bytesToBase64(recipientSaltBytes); // 24 chars with '=='
 
-                // Generate ephemeral X25519 key pair
-                const ephemeralPair = await crypto.subtle.generateKey(
-                    { name: 'X25519' }, true, ['deriveKey', 'deriveBits']
-                );
-
-                // Export ephemeral public key as standard base64
-                const ephPubJwk = await crypto.subtle.exportKey('jwk', ephemeralPair.publicKey);
-                senderPublicKey = ephPubJwk.x.replace(/-/g, '+').replace(/_/g, '/') + '=';
+                // Generate ephemeral X25519 key pair via libsodium (RFP-safe, see header comment)
+                await sodium.ready;
+                const ephPrivBytes = sodium.randombytes_buf(32);
+                const ephPubBytes = sodium.crypto_scalarmult_base(ephPrivBytes);
+                senderPublicKey = this.bytesToBase64(ephPubBytes);
 
                 // Derive shared secret via ECDH(ephemeralPrivate, recipientPublic)
                 const { encKey, hmacKey, sharedBytes } = await this.deriveKeysFromECDH(
-                    ephemeralPair.privateKey, recipientPubkeyBase64, senderPublicKey
+                    ephPrivBytes, recipientPubkeyBase64, senderPublicKey
                 );
+                sodium.memzero(ephPrivBytes);
 
                 nonceHex = await this.generateRandomBytes(12);
                 this.nonce = this.hexToBytes(nonceHex);
@@ -626,9 +617,11 @@ export function sniptoComponent() {
 
         // SYNC: deriveX25519KeyPair is also in sniptoid.js — the derivation block must match byte-for-byte.
         // `salt` is a 16-byte Uint8Array supplied by the caller (per-Snipto-ID random in v3).
+        // libsodium-only: WebCrypto's exportKey('jwk') for X25519 is blocked under
+        // privacy.resistFingerprinting in Tor/Mullvad (Firefox ESR). Same algorithm, same outputs.
         async deriveX25519KeyPair(passphrase, salt) {
             await sodium.ready;
-            const rawPrivateBytes = sodium.crypto_pwhash(
+            const privateKeyBytes = sodium.crypto_pwhash(
                 32,
                 passphrase,
                 salt,
@@ -637,33 +630,11 @@ export function sniptoComponent() {
                 sodium.crypto_pwhash_ALG_ARGON2ID13
             );
 
-            // PKCS8 wrapper for X25519: fixed 16-byte ASN.1 header + 32-byte private key
-            const pkcs8Header = new Uint8Array([
-                0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06,
-                0x03, 0x2b, 0x65, 0x6e, 0x04, 0x22, 0x04, 0x20
-            ]);
-            const pkcs8 = new Uint8Array(48);
-            pkcs8.set(pkcs8Header);
-            pkcs8.set(rawPrivateBytes, 16);
+            const publicKeyBytes = sodium.crypto_scalarmult_base(privateKeyBytes);
+            const publicKeyBase64 = this.bytesToBase64(publicKeyBytes);
 
-            const privateKey = await crypto.subtle.importKey(
-                'pkcs8', pkcs8, { name: 'X25519' }, true, ['deriveBits']
-            );
-
-            // Export to JWK to obtain the public key
-            const jwk = await crypto.subtle.exportKey('jwk', privateKey);
-            const publicKeyBase64 = jwk.x.replace(/-/g, '+').replace(/_/g, '/') + '=';
-
-            // Re-import as non-extractable for ECDH operations
-            const privateKeyForUse = await crypto.subtle.importKey(
-                'pkcs8', pkcs8, { name: 'X25519' }, false, ['deriveBits']
-            );
-
-            // Clean up sensitive material
-            rawPrivateBytes.fill(0);
-            pkcs8.fill(0);
-
-            return { privateKey: privateKeyForUse, publicKeyBase64 };
+            // Caller is responsible for sodium.memzero(privateKeyBytes) once ECDH is done.
+            return { privateKeyBytes, publicKeyBase64 };
         },
 
         concatBytes(...arrays) {
@@ -677,20 +648,14 @@ export function sniptoComponent() {
             return result;
         },
 
-        async deriveKeysFromECDH(privateKey, theirPublicKeyBase64, myPublicKeyBase64) {
-            const pubKeyBytes = this.base64ToBytes(theirPublicKeyBase64);
-            const theirPublicKey = await crypto.subtle.importKey(
-                'raw', pubKeyBytes, { name: 'X25519' }, false, []
-            );
-
-            const sharedBits = await crypto.subtle.deriveBits(
-                { name: 'X25519', public: theirPublicKey }, privateKey, 256
-            );
-            const sharedBytes = new Uint8Array(sharedBits);
+        async deriveKeysFromECDH(privateKeyBytes, theirPublicKeyBase64, myPublicKeyBase64) {
+            await sodium.ready;
+            const theirPubBytes = this.base64ToBytes(theirPublicKeyBase64);
+            const sharedBytes = sodium.crypto_scalarmult(privateKeyBytes, theirPubBytes);
 
             // Use HKDF (not PBKDF2) — ECDH output already has full entropy
             const hkdfKey = await crypto.subtle.importKey(
-                'raw', sharedBits, 'HKDF', false, ['deriveKey']
+                'raw', sharedBytes, 'HKDF', false, ['deriveKey']
             );
 
             const enc = new TextEncoder();
@@ -737,12 +702,13 @@ export function sniptoComponent() {
 
             try {
                 const saltBytes = this.base64ToBytes(this.recipientSalt);
-                const { privateKey, publicKeyBase64 } = await this.deriveX25519KeyPair(this.sniptoIdPassphrase, saltBytes);
+                const { privateKeyBytes, publicKeyBase64 } = await this.deriveX25519KeyPair(this.sniptoIdPassphrase, saltBytes);
 
                 // Compute ECDH shared secret with sender's ephemeral public key (available from init())
                 const { encKey, hmacKey, sharedBytes } = await this.deriveKeysFromECDH(
-                    privateKey, this.senderPublicKey, publicKeyBase64
+                    privateKeyBytes, this.senderPublicKey, publicKeyBase64
                 );
+                sodium.memzero(privateKeyBytes);
 
                 // key_hash = SHA-256 of the ECDH shared secret (not the public key)
                 const keyHash = await this.sha256Hex(sharedBytes);
