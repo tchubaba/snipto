@@ -2,7 +2,7 @@
 
 @section('header-js')
     @vite(['resources/js/sodium-bundle.js'])
-    <script src="{{ asset('build/js/wordlist.js') }}?v={{ file_exists(public_path('build/js/wordlist.js')) ? filemtime(public_path('build/js/wordlist.js')) : '0' }}"></script>
+    @include('partials.diceware-loader')
     <script type="module" src="{{ asset('build/js/snipto.js') }}?v={{ filemtime(public_path('build/js/snipto.js')) }}"></script>
 @endsection
 

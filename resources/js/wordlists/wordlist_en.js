@@ -114,19 +114,3 @@ window.SNIPTO_WORDLIST = [
     "yield", "yo-yo", "yodel", "yoga", "yoyo", "yummy", "zebra", "zero", "zesty", "zippy", "zone", "zoom",
 ];
 
-// Generate a diceware-style passphrase. Uses crypto.getRandomValues with
-// rejection sampling to avoid modulo bias.
-window.generateDicewarePassphrase = function (wordCount = 6) {
-    const list = window.SNIPTO_WORDLIST;
-    const n = list.length; // 1296
-    const max = Math.floor(0x10000 / n) * n;
-    const out = [];
-    const buf = new Uint16Array(1);
-    while (out.length < wordCount) {
-        crypto.getRandomValues(buf);
-        if (buf[0] < max) {
-            out.push(list[buf[0] % n]);
-        }
-    }
-    return out.join('-');
-};

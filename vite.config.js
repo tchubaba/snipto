@@ -36,8 +36,8 @@ export default defineConfig({
                     dest: 'js',
                 },
                 {
-                    src: 'resources/js/wordlist.js',
-                    dest: 'js',
+                    src: 'resources/js/wordlists/*',
+                    dest: 'js/wordlists',
                 },
             ],
         }),

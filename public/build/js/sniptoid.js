@@ -66,8 +66,8 @@ export function sniptoidComponent(minPassphraseLength = 20) {
             }
         },
 
-        generatePassphrase() {
-            this.passphrase = window.generateDicewarePassphrase(6);
+        async generatePassphrase() {
+            this.passphrase = await window.generateDicewarePassphrase();
             this.passphraseGenerated = true;
             // Sticky reveal: if the user already chose to reveal, keep it revealed across regenerations
             // and treat the new passphrase as acknowledged since it is already on screen.

@@ -942,11 +942,12 @@ export function sniptoComponent() {
                 .join('');
         },
 
-        generatePassword() {
-            this.protectionPassword = window.generateDicewarePassphrase(6);
+        async generatePassword() {
+            this.protectionPassword = await window.generateDicewarePassphrase();
             this.passwordGenerated = true;
-            this.passwordAcknowledged = false;
-            this.passwordRevealed = false;
+            // Sticky reveal: if the user already chose to reveal, keep it revealed across regenerations
+            // and treat the new password as acknowledged since it is already on screen.
+            this.passwordAcknowledged = this.passwordRevealed;
         },
 
         onPasswordInput() {
