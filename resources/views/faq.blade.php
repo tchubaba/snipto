@@ -17,6 +17,7 @@
                 <li><a href="#lost-key" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('What if the decryption key is lost?') !!}</a></li>
                 <li><a href="#content-types" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('What kinds of content can I store?') !!}</a></li>
                 <li><a href="#personal-info" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('Is any personal information stored or collected with my Snipto?') !!}</a></li>
+                <li><a href="#snipto-id-identity" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('How does Snipto ID work? Is it linked to my identity?') !!}</a></li>
                 <li><a href="#end-to-end" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('How can I be sure my Snipto is end-to-end encrypted?') !!}</a></li>
                 <li><a href="#integrity" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('How do you ensure my data hasn’t been tampered with?') !!}</a></li>
             </ul>
@@ -100,6 +101,16 @@
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Is any personal information stored or collected with my Snipto?') !!}</h2>
                 <p>
                     {!! __('No personal identifiable information is stored or collected with your Snipto. We only store the <strong>ciphertext</strong> (your Snipto in encrypted form), a unique random identifier used for decryption, and metadata about expiration and whether the Snipto has been viewed. Your IP address or any other identifying info is <strong>never stored</strong> with your Snipto.') !!}
+                </p>
+            </div>
+
+            <div id="snipto-id-identity" class="scroll-mt-13">
+                <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('How does Snipto ID work? Is it linked to my identity?') !!}</h2>
+                <p class="mt-2">
+                    {!! __('A Snipto ID is a 64-character pseudonymous identifier you create from a passphrase. When you click "Generate Snipto ID", your browser combines your passphrase with a fresh random value (a salt) to derive a cryptographic key pair. The ID you see is your public key plus that salt, encoded as text. The matching private key — needed to decrypt messages sent to your ID — is never stored anywhere; it is regenerated on demand from your passphrase.') !!}
+                </p>
+                <p class="mt-2">
+                    {!! __('<strong>No part of this process touches our servers.</strong> The ID, your passphrase, and the derived keys never leave your device. We have no record of which Snipto IDs exist, who created them, or when. Even when someone later uses your ID to send you an encrypted Snipto, what reaches our servers is only the encrypted payload and an ephemeral key — nothing that identifies you, your IP address, or your device. <strong>A Snipto ID is not an account, not a profile, and not linked to your real-world identity in any way.</strong>') !!}
                 </p>
             </div>
 

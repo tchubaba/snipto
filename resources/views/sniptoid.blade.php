@@ -36,6 +36,7 @@
         [x-cloak] { display: none !important; }
     </style>
 
+    <div class="flex flex-col items-center w-full">
     <div class="max-w-xl w-full rounded-xl p-6 space-y-6
             shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
             transition-colors duration-300"
@@ -180,5 +181,12 @@
              class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-900/95 dark:bg-gray-100/95 text-white dark:text-gray-900
             px-8 py-4 rounded-2xl shadow-2xl z-50 text-base font-medium whitespace-nowrap border border-white/10 dark:border-black/10 backdrop-blur-sm text-center" x-text="toastMessage">
         </div>
+    </div>
+
+        <p class="max-w-xl w-full mt-6 px-2 text-xs text-center text-gray-500 dark:text-gray-400">
+            <strong>{!! __('Privacy:') !!}</strong>
+            {!! __('Your Snipto ID is generated entirely in your browser — never sent to or stored on our servers, and not linked to your name, IP address, or any identifying information.') !!}
+            <a href="{{ url('/faq') }}#snipto-id-identity" class="text-indigo-500 hover:underline">{!! __('Learn more') !!}</a>
+        </p>
     </div>
 @endsection
