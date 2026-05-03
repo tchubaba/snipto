@@ -65,6 +65,26 @@
                 </p>
             </div>
 
+            <details class="mb-6 rounded-lg bg-gray-50 dark:bg-gray-900/50">
+                <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                    {{ __('How does Snipto ID work?') }}
+                </summary>
+                <div class="px-4 pb-4 space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                    <p>
+                        {!! __('Snipto ID lets you receive encrypted messages without exchanging a new key for each one. Once you’ve created an ID and given it to others, anyone can send you a Snipto that only you can decrypt, using the same passphrase you used to create the ID.') !!}
+                    </p>
+                    <p>{!! __('Here’s the full workflow:') !!}</p>
+                    <ul class="list-disc list-inside space-y-2 ml-2">
+                        <li>{!! __('<strong>You create your Snipto ID</strong> by entering a passphrase you can remember and clicking "Generate Snipto ID" below. Your browser produces a 64-character ID. <strong>Save both the ID and the passphrase</strong>. You’ll need them again, and there’s no way to recover either if lost.') !!}</li>
+                        <li>{!! __('<strong>You share the Snipto ID</strong> with anyone you want to receive Sniptos from. The ID is safe to share publicly; by itself it can’t be used to read messages sent to you.') !!}</li>
+                        <li>{!! __('<strong>The sender creates a Snipto addressed to your ID.</strong> On the main page, they paste your Snipto ID, type their message, and click create. Their browser encrypts the message for your public key. Only the encrypted result reaches our servers.') !!}</li>
+                        <li>{!! __('<strong>You open the Snipto with your passphrase.</strong> The sender shares the resulting URL with you. When you open it, you’re asked for the same passphrase you used to create your ID. Your browser re-derives your private key from that passphrase, decrypts the message, and displays it. The Snipto is then deleted.') !!}</li>
+                    </ul>
+                    <p>{!! __('Protect your Snipto ID and passphrase like any online credentials you use regularly; we recommend a password manager for both.') !!}</p>
+                    <p>{!! __('You can use the same Snipto ID indefinitely with as many senders as you like. To retire an ID, simply stop using it; there is no account to close.') !!}</p>
+                </div>
+            </details>
+
             <div class="space-y-4">
                 <div class="space-y-1">
                     <div class="relative">
@@ -185,7 +205,7 @@
 
         <p class="max-w-xl w-full mt-6 px-2 text-xs text-center text-gray-500 dark:text-gray-400">
             <strong>{!! __('Privacy:') !!}</strong>
-            {!! __('Your Snipto ID is generated entirely in your browser — never sent to or stored on our servers, and not linked to your name, IP address, or any identifying information.') !!}
+            {!! __('Your Snipto ID is generated entirely in your browser. It is never sent to or stored on our servers, and not linked to your name, IP address, or any identifying information.') !!}
             <a href="{{ url('/faq') }}#snipto-id-identity" class="text-indigo-500 hover:underline">{!! __('Learn more') !!}</a>
         </p>
     </div>

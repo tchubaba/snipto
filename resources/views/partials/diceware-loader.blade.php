@@ -30,12 +30,26 @@
         const defaultWordCount = @json($wordCount);
         let loadPromise = null;
 
+        // Required because the page enforces require-trusted-types-for 'script'.
+        // Assigning a plain string to script.src is blocked; we must wrap the URL
+        // in a TrustedScriptURL produced by a registered policy. The policy only
+        // accepts the exact wordlist URL computed by the server.
+        let scriptUrlPolicy = null;
+        if (window.trustedTypes && window.trustedTypes.createPolicy) {
+            scriptUrlPolicy = window.trustedTypes.createPolicy('snipto-wordlist', {
+                createScriptURL: (input) => {
+                    if (input !== url) throw new Error('Refused unexpected wordlist URL');
+                    return input;
+                },
+            });
+        }
+
         function loadWordlist() {
             if (window.SNIPTO_WORDLIST) return Promise.resolve();
             if (loadPromise) return loadPromise;
             loadPromise = new Promise((resolve, reject) => {
                 const s = document.createElement('script');
-                s.src = url;
+                s.src = scriptUrlPolicy ? scriptUrlPolicy.createScriptURL(url) : url;
                 s.onload = () => resolve();
                 s.onerror = () => reject(new Error('Failed to load diceware wordlist'));
                 document.head.appendChild(s);
