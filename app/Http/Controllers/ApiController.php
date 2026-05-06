@@ -20,35 +20,26 @@ class ApiController extends Controller
     /**
      * Displays the specified Snipto resource by its unique slug.
      *
-     * This method retrieves a Snipto record based on the provided slug. If no such record
-     * exists, it returns a 404 error response. If the record exists but is expired,
-     * the record is deleted and a 410 error response is returned. Otherwise, the method
-     * responds with the Snipto's details as a JSON object.
-     *
      * Behavior:
-     * - If the slug does not match an existing record, returns a 404 response indicating the resource was not found.
-     * - If the record exists but has expired, deletes the record and returns a 410 response indicating the expiration.
-     * - If the record exists and is not expired, returns its details including payload, IV, remaining views, and expiration timestamp.
+     * - If the slug does not match an existing record, returns a 404.
+     * - If the record exists but has expired, deletes it and returns a 404 (the slug is
+     *   effectively free to reuse; treating expired-as-not-found also avoids leaking the
+     *   prior existence of a snipto to slug probers).
+     * - For Plaintext sniptos, returns the payload immediately and decrements views.
+     * - For encrypted sniptos without a valid key_hash, returns metadata only (protection
+     *   type plus Snipto ID / Password fields the client needs to derive its key_hash).
+     * - For encrypted sniptos with a valid key_hash, returns the payload, nonce, and
+     *   decremented views_remaining. An invalid key_hash returns 403.
      *
      * @param  string  $slug  The unique identifier for retrieving the Snipto resource.
      * @return JsonResponse A structured JSON response containing the requested data or an error message.
      */
     public function show(string $slug, Request $request): JsonResponse
     {
-        $keyHash = $request->string('key_hash')->toString();
-
         $snipto = Snipto::where('slug', $slug)->first();
 
-        if ( ! $snipto) {
-            return response()->json([
-                'success' => false,
-                'exists'  => false,
-                'message' => 'Snipto not found',
-            ], 404);
-        }
-
-        if ($snipto->isExpired()) {
-            $snipto->delete();
+        if ( ! $snipto || $snipto->isExpired()) {
+            $snipto?->delete();
 
             return response()->json([
                 'success' => false,
@@ -67,41 +58,53 @@ class ApiController extends Controller
             ]);
         }
 
-        if ( ! empty($keyHash) && ! hash_equals($snipto->key_hash, $keyHash)) {
+        $keyHash = $request->string('key_hash')->toString();
+
+        if (empty($keyHash)) {
+            $response = [
+                'success'         => true,
+                'exists'          => true,
+                'protection_type' => $snipto->protection_type->value,
+            ];
+
+            // Snipto ID mode derives key_hash from the ECDH shared secret between the
+            // sender's ephemeral pubkey and the recipient's private key. The recipient
+            // re-derives that private key from passphrase + recipient_salt, then completes
+            // ECDH against sender_public_key, before it can present a valid key_hash. All
+            // three fields are public by design (the salt and pubkey ship inside the
+            // recipient's published Snipto ID); key_provider_type just tells the client
+            // which derivation to run.
+            if ($snipto->isSniptoId()) {
+                $response['sender_public_key'] = $snipto->sender_public_key;
+                $response['key_provider_type'] = $snipto->key_provider_type;
+                $response['recipient_salt']    = $snipto->recipient_salt;
+            }
+
+            // Password mode derives key_hash from Argon2id(password, ...nonce-derived salt...).
+            // The recipient needs the nonce to reproduce the derivation before it can present
+            // a valid key_hash, so it is exposed pre-auth. The nonce is an IV/salt, not a secret.
+            if ($snipto->isPasswordProtected()) {
+                $response['nonce'] = $snipto->nonce;
+            }
+
+            return response()->json($response);
+        }
+
+        if ( ! hash_equals($snipto->key_hash, $keyHash)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Key Hash invalid.',
             ], 403);
         }
 
-        // The base response for when a snipto is found.
-        $response = [
+        return response()->json([
             'success'         => true,
             'exists'          => true,
             'protection_type' => $snipto->protection_type->value,
-        ];
-
-        if ($snipto->isSniptoId()) {
-            $response['sender_public_key'] = $snipto->sender_public_key;
-            $response['key_provider_type'] = $snipto->key_provider_type;
-            $response['recipient_salt']    = $snipto->recipient_salt;
-        }
-
-        // Password mode derives key_hash from Argon2id(password, ...nonce-derived salt...).
-        // The recipient needs the nonce to reproduce the derivation before it can present
-        // a valid key_hash, so it is exposed pre-auth. The nonce is an IV/salt, not a secret.
-        if ($snipto->isPasswordProtected()) {
-            $response['nonce'] = $snipto->nonce;
-        }
-
-        // If the key hash is present and valid, add the payload, decrement views and include view_remaining.
-        if ( ! empty($keyHash)) {
-            $response['payload']         = $snipto->payload;
-            $response['nonce']           = $snipto->nonce;
-            $response['views_remaining'] = $snipto->decrementViews();
-        }
-
-        return response()->json($response);
+            'payload'         => $snipto->payload,
+            'nonce'           => $snipto->nonce,
+            'views_remaining' => $snipto->decrementViews(),
+        ]);
     }
 
     /**
