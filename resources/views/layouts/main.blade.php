@@ -72,9 +72,10 @@
                 <div x-show="open" x-transition @click.away="open = false"
                      class="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
                     <template x-for="(locale, code) in locales" :key="code">
-                        <form method="POST" action="{{ route('locale.change') }}">
+                        <form method="POST" action="{{ route('locale.change') }}" @submit.prevent="submitLocaleForm($event)">
                             @csrf
-                            <button type="submit" name="locale" :value="code"
+                            <input type="hidden" name="locale" :value="code">
+                            <button type="submit"
                                     class="flex items-center w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-left">
                                 <span :class="'fi fi-' + locale.flag" class="mr-2 w-5 h-4 rounded-sm overflow-hidden"></span>
                                 <span x-text="locale.name"></span>
@@ -97,6 +98,13 @@
                 locale: "{{ session('locale', config('app.locale')) }}",
                 get current() {
                     return this.locales[this.locale] || Object.values(this.locales)[0];
+                },
+                submitLocaleForm(event) {
+                    let eventObj = new CustomEvent('request-language-change', { detail: { form: event.target }, cancelable: true });
+                    window.dispatchEvent(eventObj);
+                    if (!eventObj.defaultPrevented) {
+                        event.target.submit();
+                    }
                 }
             }
         }

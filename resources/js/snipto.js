@@ -59,6 +59,27 @@ export function sniptoComponent() {
         passwordAcknowledged: false,
         passwordGenerated: false,
         passwordNonceHex: null,
+        showLanguageWarningModal: false,
+        pendingLanguageForm: null,
+
+        closeLanguageWarningModal() {
+            this.showLanguageWarningModal = false;
+            this.pendingLanguageForm = null;
+        },
+
+        submitPendingLanguageForm() {
+            if (this.pendingLanguageForm) {
+                this.pendingLanguageForm.submit();
+            }
+        },
+
+        handleLanguageChangeRequest(event) {
+            if (this.showPayload) {
+                event.preventDefault();
+                this.pendingLanguageForm = event.detail.form;
+                this.showLanguageWarningModal = true;
+            }
+        },
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
