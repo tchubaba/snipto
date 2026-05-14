@@ -12,14 +12,20 @@
         @php
             echo json_encode([
                 'Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.' => __('Whoa, take it easy! You’ve hit your snipto limit. Give it a minute before trying again.'),
-                'We can’t open this Snipto. The encryption key is missing in the URL.' => __('We can’t open this Snipto. The encryption key is missing in the URL.'),
-                'We cannot open this Snipto. It appears the encryption key is invalid.' => __('We cannot open this Snipto. It appears the encryption key is invalid.'),
+                'We can’t open this Snipto' => __('We can’t open this Snipto'),
+                'This Snipto is end-to-end encrypted with a key carried in the URL — the part after #k=. That key is missing from the link you opened, so there is no way to decrypt the content.' => __('This Snipto is end-to-end encrypted with a key carried in the URL — the part after #k=. That key is missing from the link you opened, so there is no way to decrypt the content.'),
+                'If you received this link from someone, the trailing #k=… part may have been stripped by the chat or email client. Ask the sender to share the full link again.' => __('If you received this link from someone, the trailing #k=… part may have been stripped by the chat or email client. Ask the sender to share the full link again.'),
+                'This Snipto is end-to-end encrypted with a key carried in the URL, but the key in your link doesn’t match the one this Snipto was created with. The link may have been altered or copied incompletely.' => __('This Snipto is end-to-end encrypted with a key carried in the URL, but the key in your link doesn’t match the one this Snipto was created with. The link may have been altered or copied incompletely.'),
+                'Ask the sender to share the full, untouched link again. Snipto links are single-use and cannot be edited.' => __('Ask the sender to share the full, untouched link again. Snipto links are single-use and cannot be edited.'),
+                'The Snipto was found and the key was accepted, but its contents failed integrity verification. The encrypted data may be corrupted or have been tampered with.' => __('The Snipto was found and the key was accepted, but its contents failed integrity verification. The encrypted data may be corrupted or have been tampered with.'),
+                'For your safety, we won’t display content that can’t be verified. Please contact the sender.' => __('For your safety, we won’t display content that can’t be verified. Please contact the sender.'),
+                'A network or server error prevented us from loading this Snipto.' => __('A network or server error prevented us from loading this Snipto.'),
+                'Please check your connection and try again in a moment.' => __('Please check your connection and try again in a moment.'),
                 'WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).' => __('WARNING: The automatic deletion of this snipto failed! This snipto will remain visible until it expires (1 week after creation).'),
                 'ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.' => __('ATTENTION: This snipto was configured to be viewed more than 1 time. It can still be viewed :count more times.'),
                 'An error occurred. Please try again.' => __('An error occurred. Please try again.'),
                 'Failed to render snipto content. Please copy it manually.' => __('Failed to render snipto content. Please copy it manually.'),
                 'Failed to find display element.' => __('Failed to find display element.'),
-                'Could not decrypt the Snipto. Decryption failed or data tampered.' => __('Could not decrypt the Snipto. Decryption failed or data tampered.'),
                 'Copied to clipboard!' => __('Copied to clipboard!'),
                 'Copying failed. Please copy manually.' => __('Copying failed. Please copy manually.'),
                 'This snippet is protected by a password.' => __('This snippet is protected by a password.'),
@@ -58,14 +64,16 @@
         [x-cloak] { display: none !important; }
     </style>
 
-    <div class="max-w-4xl w-full rounded-xl p-6 space-y-4
-            shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-            transition-colors duration-300"
+    <div class="w-full max-w-4xl flex flex-col"
          x-data="sniptoComponent()"
          x-init="init()"
          data-slug="{{ request()->path() }}"
          x-on:before-unmount.window="destroy()"
          x-on:request-language-change.window="handleLanguageChangeRequest($event)"
+    >
+    <div class="rounded-xl p-6 space-y-4
+            shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+            transition-colors duration-300"
     >
         <!-- Loader -->
         <div x-show="loading"
@@ -415,7 +423,7 @@
                  x-transition.opacity.duration.500ms
                  x-transition.scale.origin.top
                  class="space-y-4 transform transition-all duration-300">
-                <p class="text-green-600 dark:text-green-400 font-medium">{!! __('Here’s your Snipto:') !!}</p>
+                <p class="text-xl font-medium text-green-600 dark:text-green-400">{!! __('Snipto created. Share this link with the recipient:') !!}</p>
                 <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
                     <input type="text" :value="fullUrl" readonly
                            x-ref="fullUrlInput"
@@ -427,24 +435,72 @@
                         {!! __('Copy') !!}
                     </button>
                 </div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 text-center" x-show="expirationValue === '1h'">
-                    {!! __('Your Snipto will be available for retrieval for the next hour. After that, it will be deleted automatically.') !!}
-                </p>
-                <p class="text-sm text-gray-500 dark:text-gray-400 text-center" x-show="expirationValue === '1d'" x-cloak>
-                    {!! __('Your Snipto will be available for retrieval for the next day. After that, it will be deleted automatically.') !!}
-                </p>
-                <p class="text-sm text-gray-500 dark:text-gray-400 text-center" x-show="expirationValue === '1w'" x-cloak>
-                    {!! __('Your Snipto will be available for retrieval for the next week. After that, it will be deleted automatically.') !!}
-                </p>
-                <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>
+                <div class="flex flex-col items-center pt-2 space-y-2">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{!! __('Or scan this QR code') !!}</p>
+                    <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>
+                </div>
             </div>
 
-            <!-- Error -->
+            <!-- Decryption / load error panel -->
+            <div x-show="decryptError" x-cloak
+                 x-transition.opacity.duration.300ms
+                 class="space-y-4 max-w-3xl mx-auto py-8">
+                <div class="text-center space-y-3">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h3 class="text-3xl font-medium text-gray-900 dark:text-gray-100">
+                        {!! __('We can’t open this Snipto') !!}
+                    </h3>
+                    <p x-show="decryptError === 'rusk_missing'" class="text-lg text-gray-600 dark:text-gray-300">
+                        {!! __('This Snipto is end-to-end encrypted with a key carried in the URL — the part after #k=. That key is missing from the link you opened, so there is no way to decrypt the content.') !!}
+                    </p>
+                    <p x-show="decryptError === 'rusk_missing'" class="text-base text-gray-500 dark:text-gray-400">
+                        {!! __('If you received this link from someone, the trailing #k=… part may have been stripped by the chat or email client. Ask the sender to share the full link again.') !!}
+                    </p>
+                    <p x-show="decryptError === 'rusk_invalid'" class="text-lg text-gray-600 dark:text-gray-300">
+                        {!! __('This Snipto is end-to-end encrypted with a key carried in the URL, but the key in your link doesn’t match the one this Snipto was created with. The link may have been altered or copied incompletely.') !!}
+                    </p>
+                    <p x-show="decryptError === 'rusk_invalid'" class="text-base text-gray-500 dark:text-gray-400">
+                        {!! __('Ask the sender to share the full, untouched link again. Snipto links are single-use and cannot be edited.') !!}
+                    </p>
+                    <p x-show="decryptError === 'integrity'" class="text-lg text-gray-600 dark:text-gray-300">
+                        {!! __('The Snipto was found and the key was accepted, but its contents failed integrity verification. The encrypted data may be corrupted or have been tampered with.') !!}
+                    </p>
+                    <p x-show="decryptError === 'integrity'" class="text-base text-gray-500 dark:text-gray-400">
+                        {!! __('For your safety, we won’t display content that can’t be verified. Please contact the sender.') !!}
+                    </p>
+                    <p x-show="decryptError === 'network'" class="text-lg text-gray-600 dark:text-gray-300">
+                        {!! __('A network or server error prevented us from loading this Snipto.') !!}
+                    </p>
+                    <p x-show="decryptError === 'network'" class="text-base text-gray-500 dark:text-gray-400">
+                        {!! __('Please check your connection and try again in a moment.') !!}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Error (creation form) -->
             <div x-show="errorMessage" x-cloak
                  x-transition.opacity.duration.300ms
                  x-text="errorMessage"
                  class="text-red-600 dark:text-red-400 mt-4 font-medium">
             </div>
+        </div>
+        </div>
+
+        <!-- Expiration disclaimer (outside card, only on success) -->
+        <div x-show="showSuccess" x-cloak class="mt-4 px-2">
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center" x-show="expirationValue === '1h'">
+                {!! __('Your Snipto will be available for retrieval for the next hour. After that, it will be deleted automatically.') !!}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center" x-show="expirationValue === '1d'" x-cloak>
+                {!! __('Your Snipto will be available for retrieval for the next day. After that, it will be deleted automatically.') !!}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center" x-show="expirationValue === '1w'" x-cloak>
+                {!! __('Your Snipto will be available for retrieval for the next week. After that, it will be deleted automatically.') !!}
+            </p>
         </div>
 
         <!-- Toast notification -->

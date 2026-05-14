@@ -61,6 +61,16 @@ export function sniptoComponent() {
         passwordNonceHex: null,
         showLanguageWarningModal: false,
         pendingLanguageForm: null,
+        decryptError: '', // '' | 'rusk_missing' | 'rusk_invalid' | 'integrity' | 'network'
+
+        setDecryptError(variant) {
+            this.decryptError = variant;
+            this.showPasswordPrompt = false;
+            this.showSniptoIdPrompt = false;
+            this.showPayload = false;
+            this.showForm = false;
+            this.loading = false;
+        },
 
         closeLanguageWarningModal() {
             this.showLanguageWarningModal = false;
@@ -149,7 +159,7 @@ export function sniptoComponent() {
                 } else if (this.protectionType === 1) {
                     // Mode 1: URL Secret
                     if (!shortSecretBytes) {
-                        this.errorMessage = this.t('We can’t open this Snipto. The encryption key is missing in the URL.');
+                        this.setDecryptError('rusk_missing');
                         return;
                     }
                     await this.retrieveAndDecrypt(shortSecretBytes);
@@ -175,7 +185,7 @@ export function sniptoComponent() {
                     this.showSniptoIdPrompt = true;
                 }
             } catch {
-                this.errorMessage = this.t('An error occurred. Please try again.');
+                this.setDecryptError('network');
             } finally {
                 if (shortSecretBytes) shortSecretBytes.fill(0);
                 this.loading = false;
@@ -204,10 +214,11 @@ export function sniptoComponent() {
                 });
 
                 if (res.status === 403) {
-                    const msg = this.protectionType === 2
-                        ? this.t('Invalid password. Please try again.')
-                        : this.t('We cannot open this Snipto. It appears the encryption key is invalid.');
-                    this.showToastMessage(msg);
+                    if (this.protectionType === 2) {
+                        this.showToastMessage(this.t('Invalid password. Please try again.'));
+                    } else {
+                        this.setDecryptError('rusk_invalid');
+                    }
                     return;
                 }
 
@@ -238,14 +249,14 @@ export function sniptoComponent() {
 
                 this.clearSensitiveRetrieval();
             } catch (err) {
-                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
+                this.setDecryptError('integrity');
             }
         },
 
         async unlockWithPassword() {
             if (!this.protectionPassword.trim()) return;
             if (!this.passwordNonceHex) {
-                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
+                this.setDecryptError('integrity');
                 return;
             }
             this.loading = true;
@@ -625,7 +636,7 @@ export function sniptoComponent() {
                     this.fullUrl += `#k=${shortSecretStr}`;
                 }
 
-                QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 128 });
+                QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 256, margin: 2 });
                 this.$refs.fullUrlInput.select();
 
                 this.clearSensitiveCreation();
@@ -716,8 +727,7 @@ export function sniptoComponent() {
             this.loading = true;
 
             if (!this.recipientSalt || !/^[A-Za-z0-9+/]{22}==$/.test(this.recipientSalt)) {
-                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
-                this.loading = false;
+                this.setDecryptError('integrity');
                 return;
             }
 
@@ -768,7 +778,9 @@ export function sniptoComponent() {
 
                 this.clearSensitiveRetrieval();
             } catch (err) {
-                this.showToastMessage(this.t('Could not decrypt the Snipto. Decryption failed or data tampered.'));
+                this.sniptoIdPassphrase = '';
+                this.setDecryptError('integrity');
+                return;
             } finally {
                 this.sniptoIdPassphrase = '';
                 this.loading = false;
