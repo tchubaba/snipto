@@ -23,10 +23,10 @@ Route::view('/sniptoid', 'sniptoid')->name('sniptoid');
 // Create a new snippet (AJAX POST)
 Route::prefix('api/snipto')->group(function () {
     Route::post('/', [ApiController::class, 'store'])
-        ->middleware('progressive.throttle:store-snipto');
+        ->middleware('tiered.throttle:store-snipto');
     Route::get('{slug}', [ApiController::class, 'show'])
         ->where('slug', '[A-Za-z0-9_-]+')
-        ->middleware('progressive.throttle:show-snipto');
+        ->middleware('tiered.throttle:show-snipto');
 });
 
 Route::post('/locale', function (Request $request) {

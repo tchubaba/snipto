@@ -3,7 +3,7 @@
     "name": "tchubaba/snipto",
     "type": "project",
     "description": "A secure, lightweight online snippet sharing service with end-to-end encryption.",
-    "version": "1.7.0",
+    "version": "1.7.1",
     "keywords": [
         "snipto",
         "snippet",
@@ -16,7 +16,8 @@
         "php": "^8.5",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
-        "spatie/laravel-csp": "^3.18"
+        "spatie/laravel-csp": "^3.18",
+        "tchubaba/tiered-throttle": "^1.0"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",

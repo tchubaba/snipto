@@ -6,11 +6,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Progressive Rate Limiter Definitions
+    | Tiered Rate Limiter Definitions
     |--------------------------------------------------------------------------
     |
-    | Each entry under 'limiters' defines a named progressive rate limiter that
-    | can be applied to a route via the 'progressive.throttle:<name>' middleware.
+    | Each entry under 'limiters' defines a named tiered rate limiter that
+    | can be applied to a route via the 'tiered.throttle:<name>' middleware.
     |
     | HOW IT WORKS
     | ------------
@@ -52,12 +52,12 @@ return [
     |
     | The only ways to reach a full tier-0 reset are:
     |   1. The offense TTL expires naturally (no new offenses during that period).
-    |   2. Manual intervention via: php artisan snipto:unban <ip>
+    |   2. Manual intervention via: php artisan throttle:unban <ip>
     |
     | ADDING A NEW LIMITER
     | --------------------
     | 1. Add an entry here with the desired tiers, lockout_seconds, offense_ttl.
-    | 2. Apply it to a route: ->middleware('progressive.throttle:<limiter-name>')
+    | 2. Apply it to a route: ->middleware('tiered.throttle:<limiter-name>')
     |
     */
 
@@ -65,36 +65,29 @@ return [
 
         /*
          | show-snipto
-         | Applied to: GET /api/snipto/{slug}  and  POST /api/snipto/{slug}/viewed
-         |
-         | Covers snippet retrieval. Three tiers provide a generous baseline for
-         | legitimate users while escalating quickly against scrapers or brute-force
-         | attempts on password-protected or Snipto ID snippets.
+         | Applied to: GET /api/snipto/{slug}
          */
         'show-snipto' => [
             'tiers' => [
-                [20, 60],   // Tier 0: 10 attempts per 1 minute  (baseline)
+                [20, 60],   // Tier 0: 20 attempts per 1 minute  (baseline)
                 [10, 120],  // Tier 1: 10 attempts per 2 minutes (first offense)
                 [5,  300],  // Tier 2:  5 attempts per 5 minutes (second offense)
             ],
-            'lockout_seconds' => 43200, // 12 hours  — third offense triggers full lockout
-            'offense_ttl'     => 7200, // 2 hours  — offense counter resets after 2h clean
+            'lockout_seconds' => 43200, // 12 hours
+            'offense_ttl'     => 7200, // 2 hours
         ],
 
         /*
          | store-snipto
          | Applied to: POST /api/snipto
-         |
-         | Covers snippet creation. Two tiers are sufficient; creation is less
-         | latency-sensitive and spam attempts should be cut off faster.
          */
         'store-snipto' => [
             'tiers' => [
                 [10, 60],  // Tier 0: 10 attempts per 1 minute  (baseline)
                 [5,  300], // Tier 1:  5 attempts per 5 minutes (first offense)
             ],
-            'lockout_seconds' => 43200, // 12 hours  — second offense triggers full lockout
-            'offense_ttl'     => 7200, // 2 hours  — offense counter resets after 2h clean
+            'lockout_seconds' => 43200, // 12 hours
+            'offense_ttl'     => 7200, // 2 hours
         ],
 
     ],
