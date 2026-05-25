@@ -207,7 +207,28 @@ export function sniptoComponent() {
 
         async retrieveAndDecrypt(secretBytes, preDerived = null) {
             try {
-                const secretHash = preDerived ? preDerived.secretHash : await this.sha256Hex(secretBytes);
+                // URL Secret (Mode 1): derive key_hash from Argon2id master via HKDF, which
+                // requires the nonce. The nonce is only available from a pre-auth GET request,
+                // so we do a two-step approach: first fetch to get the nonce, then derive
+                // key_hash and fetch again with it.
+                if (this.protectionType === 1 && !preDerived) {
+                    const res = await fetch(`/api/snipto/${this.slug}`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (!res.ok) throw new Error();
+                    const data = await res.json();
+                    const nonceHex = data.nonce;
+                    const derived = await this.deriveKeys(secretBytes, nonceHex);
+                    return this.retrieveAndDecrypt(null, {
+                        secretHash: derived.keyHash,
+                        encKey: derived.encKey,
+                        hmacKey: derived.hmacKey,
+                        nonceHex,
+                    });
+                }
+
+                const secretHash = preDerived.secretHash;
                 const res = await fetch(`/api/snipto/${this.slug}?key_hash=${secretHash}`, {
                     method: 'GET',
                     headers: { 'Accept': 'application/json' }
@@ -505,7 +526,7 @@ export function sniptoComponent() {
                 // E2EE Mode (Secret or Password)
                 let secretSourceStr;
                 if (finalProtectionType === 1) {
-                    shortSecretStr = this.generateShortSecret(16);
+                    shortSecretStr = this.generateShortSecret(21);
                     secretSourceStr = shortSecretStr;
                 } else {
                     secretSourceStr = this.protectionPassword;
@@ -524,9 +545,7 @@ export function sniptoComponent() {
 
                 const userInputBytes = new TextEncoder().encode(this.userInput);
                 payloadToSend = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
-                secretHash = finalProtectionType === 2
-                    ? derived.keyHash
-                    : await this.sha256Hex(secretBytes);
+                secretHash = derived.keyHash;
 
                 // Clean up sensitive bytes
                 userInputBytes.fill(0);
@@ -814,38 +833,59 @@ export function sniptoComponent() {
         },
 
         async deriveKeys(secretBytes, nonceHex) {
-            const keyMaterial = await crypto.subtle.importKey(
-                'raw',
+            await sodium.ready;
+
+            // Argon2id with OWASP strong tier — same params as Password mode
+            // Argon2 requires exactly 16-byte salt; derive it from nonce via SHA-256 (domain-separated)
+            const enc = new TextEncoder();
+            const saltInput = new Uint8Array(enc.encode('snipto-urlsecret-v1').length + enc.encode(nonceHex).length);
+            saltInput.set(enc.encode('snipto-urlsecret-v1'));
+            saltInput.set(enc.encode(nonceHex), enc.encode('snipto-urlsecret-v1').length);
+            const saltDigest = await crypto.subtle.digest('SHA-256', saltInput);
+            const salt = new Uint8Array(saltDigest).slice(0, 16);
+
+            const master = sodium.crypto_pwhash(
+                32,
                 secretBytes,
-                { name: 'PBKDF2' },
-                false,
-                ['deriveKey']
+                salt,
+                3,
+                64 * 1024 * 1024,
+                sodium.crypto_pwhash_ALG_ARGON2ID13
             );
 
-            const baseParams = {
-                name: 'PBKDF2',
-                salt: new TextEncoder().encode(nonceHex),
-                iterations: 100000,
-                hash: 'SHA-256'
-            };
+            // HKDF to derive separate AES-GCM and HMAC keys from the 32-byte master
+            const hkdfKey = await crypto.subtle.importKey(
+                'raw', master, 'HKDF', false, ['deriveKey', 'deriveBits']
+            );
+            master.fill(0);  // zero out immediately
 
             const encKey = await crypto.subtle.deriveKey(
-                baseParams,
-                keyMaterial,
+                { name: 'HKDF', hash: 'SHA-256', salt: new TextEncoder().encode(nonceHex), info: new TextEncoder().encode('aes-key') },
+                hkdfKey,
                 { name: 'AES-GCM', length: 256 },
                 false,
                 ['encrypt', 'decrypt']
             );
 
             const hmacKey = await crypto.subtle.deriveKey(
-                baseParams,
-                keyMaterial,
+                { name: 'HKDF', hash: 'SHA-256', salt: new TextEncoder().encode(nonceHex), info: new TextEncoder().encode('hmac-key') },
+                hkdfKey,
                 { name: 'HMAC', hash: 'SHA-256', length: 256 },
                 false,
                 ['sign', 'verify']
             );
 
-            return { encKey, hmacKey };
+            // Derive key_hash from Argon2id master via HKDF (mirrors Mode 2).
+            // This requires the nonce, which is returned in the pre-auth GET response for Mode 1.
+            const keyHashBits = await crypto.subtle.deriveBits(
+                { name: 'HKDF', hash: 'SHA-256', salt: new TextEncoder().encode(nonceHex), info: new TextEncoder().encode('key-hash') },
+                hkdfKey,
+                256
+            );
+            const keyHash = Array.from(new Uint8Array(keyHashBits))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+
+            return { encKey, hmacKey, keyHash };
         },
 
         async deriveKeysFromPassword(passwordBytes, nonceHex) {

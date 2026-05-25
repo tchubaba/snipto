@@ -15,7 +15,7 @@ Snipto lets you share text snippets via single-use URLs. Content is encrypted in
 
 ### Protection modes
 
-- **URL Secret** — random AES-256-GCM key embedded in the URL fragment (`#k=…`). Never sent to the server.
+- **URL Secret** — random AES-256-GCM key embedded in the URL fragment (`#k=…`). Argon2id (64 MB, t=3) → HKDF-SHA256 → separate AES-GCM and HMAC keys. `key_hash` = HKDF-derived from Argon2id master (memory-hard). Never sent to the server; two-step retrieval: pre-auth GET returns nonce, client derives key_hash, second request retrieves payload.
 - **Password** — recipient enters a shared password. Argon2id (64 MB, t=3) → HKDF-SHA256 → separate AES-GCM and HMAC keys.
 - **Snipto ID** — publish a 64-character ID derived from your passphrase via X25519 + Argon2id. Senders encrypt to your public key; only your passphrase can decrypt. Private keys are never stored or transmitted — re-derived in the browser on demand.
 

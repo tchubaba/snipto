@@ -87,6 +87,14 @@ class ApiController extends Controller
                 $response['nonce'] = $snipto->nonce;
             }
 
+            // URL Secret (Mode 1) derives key_hash from Argon2id(secret, ...nonce-derived salt...).
+            // Same chicken-and-egg problem as Password mode: the client needs the nonce to derive
+            // the correct key_hash before it can present a valid one. The nonce is an IV/salt, not
+            // a secret.
+            if ($snipto->protection_type === ProtectionType::Secret) {
+                $response['nonce'] = $snipto->nonce;
+            }
+
             return response()->json($response);
         }
 
