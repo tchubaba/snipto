@@ -9,15 +9,14 @@
 
 ## Reporting a Vulnerability
 
-We take the security of Snipto seriously. If you discover a security vulnerability, please report it responsibly.
+**PLEASE DON'T DISCLOSE SECURITY-RELATED ISSUES PUBLICLY, [SEE BELOW](#reporting-a-vulnerability).**
 
-### How to Report
+If you discover a security vulnerability, please report it privately using one of the following channels:
 
-1. **Do not open a public issue.**
-2. Email us at: **[contact@snipto.net](mailto:contact@snipto.net)**
-3. Include a description of the vulnerability, steps to reproduce, and any potential impact.
-4. We will respond within **72 hours** with an initial assessment.
-5. We will work with you to resolve the issue and coordinate a public disclosure.
+1.  **GitHub Private Vulnerability Reporting (Preferred)** — go to the repository's **Security** tab and click **"Report a vulnerability"**. This creates a private advisory visible only to maintainers and provides a structured workflow for triage, fix coordination, and CVE assignment.
+2.  **Email** — send the details to **[contact@snipto.net](mailto:contact@snipto.net)**.
+
+We will respond within **72 hours** with an initial assessment and work with you to resolve the issue and coordinate a public disclosure.
 
 ### What to Expect
 
