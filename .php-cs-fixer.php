@@ -33,5 +33,6 @@ return (new Config())
         'no_unused_imports'           => true,
         'single_quote'                => true,
         'trailing_comma_in_multiline' => ['elements' => ['arrays']],
+        'fully_qualified_strict_types'=> ['import_symbols' => true],
     ])
     ->setFinder($finder);
