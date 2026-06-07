@@ -18,7 +18,7 @@ endif
 ARTISAN = $(EXEC) php artisan
 
 # Targets
-.PHONY: up down build restart prod-up prod-down prod-build artisan composer npm shell test grumphp fix lint logs fresh
+.PHONY: up down build restart prod-up prod-down prod-build prod-deploy artisan composer npm shell test grumphp fix lint logs fresh
 
 # =============================================================================
 # Development targets (default mode)
@@ -47,6 +47,15 @@ prod-down:
 
 prod-build:
 	docker compose -f docker-compose.prod.yml $(PROFILE_FLAG) build
+
+# =============================================================================
+# Production deployment — generates fresh Cloudflare IP config then starts containers
+# =============================================================================
+prod-deploy:
+	@echo "Generating fresh Cloudflare IP ranges..."
+	@./docker/generate-cloudflare-nginx-config.sh
+	@echo ""
+	docker compose -f docker-compose.prod.yml $(PROFILE_FLAG) up -d
 
 # =============================================================================
 # Utility targets — accept MODE parameter for production context
