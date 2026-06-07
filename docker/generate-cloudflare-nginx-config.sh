@@ -46,7 +46,7 @@ cat > "$OUTPUT_PATH" << 'HEADER'
 HEADER
 
 # Write the geo block (access control — checks Cloudflare IPs before translation)
-echo 'geo $cf_trusted {' >> "$OUTPUT_PATH"
+echo 'geo $realip_remote_addr $cf_trusted {' >> "$OUTPUT_PATH"
 echo '    default 0;' >> "$OUTPUT_PATH"
 
 for cidr in $CF_IPV4; do
