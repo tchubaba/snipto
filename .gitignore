@@ -24,3 +24,4 @@ Thumbs.db
 .phpstorm.meta.php
 _ide_helper.php
 .php-cs-fixer.cache
+docker/crowdsec/crowdsec-openresty-bouncer.conf

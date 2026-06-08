@@ -1,0 +1,79 @@
+FROM php:8.5-fpm
+
+USER root
+
+# Arguments defined in docker-compose.yml
+ARG user=snipto
+ARG uid=1000
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libzip-dev \
+    libicu-dev \
+    gnupg \
+    procps \
+    autoconf \
+    g++ \
+    make
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl
+
+# Install Node.js (needed for building assets)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+# Get latest Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Create system user to run Composer and Artisan Commands
+RUN if [ "$uid" != "0" ]; then \
+        if getent passwd "$uid" > /dev/null; then \
+            existing_user=$(getent passwd "$uid" | cut -d: -f1); \
+            if [ "$existing_user" != "$user" ]; then \
+                userdel -f "$existing_user"; \
+            fi; \
+        fi; \
+        if ! getent passwd "$user" > /dev/null; then \
+            useradd -G sudo,www-data -u "$uid" -d /home/"$user" "$user"; \
+        fi; \
+    fi
+
+RUN mkdir -p /home/$user/.composer && \
+    chown -R $user:$user /home/$user
+
+# Pre-create /data so a mounted named volume inherits $user ownership.
+RUN mkdir -p /data && chown $user:$user /data
+
+# Set working directory
+WORKDIR /var/www/html
+
+# Copy project files and set ownership
+COPY --chown=$user:$user . .
+
+# Production build: bake deps + built assets into the image for fast startup.
+USER $user
+RUN composer install --no-dev --optimize-autoloader --no-interaction \
+    && npm install \
+    && npm run build \
+    && rm -rf node_modules \
+    && touch vendor/.snipto-baked
+
+# Copy entrypoint script and make it executable
+USER root
+COPY docker/entrypoint-fpm.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+USER $user
+
+ENTRYPOINT ["entrypoint.sh"]

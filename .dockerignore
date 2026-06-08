@@ -17,6 +17,7 @@ storage/logs/*
 .phpunit.result.cache
 GEMINI.md
 CLAUDE.md
-docker-compose.yml
+docker-compose.dev.yml
+docker-compose.prod.yml
 config.mk
 Makefile

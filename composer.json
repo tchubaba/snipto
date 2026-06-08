@@ -17,6 +17,9 @@
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",
         "spatie/laravel-csp": "^3.18",
+        "symfony/http-foundation": "~8.0.13",
+        "symfony/polyfill-intl-idn": "~1.38.1",
+        "symfony/routing": "~8.0.13",
         "tchubaba/tiered-throttle": "^1.0"
     },
     "require-dev": {

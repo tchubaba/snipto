@@ -19,7 +19,6 @@ export function sniptoidComponent(minPassphraseLength = 20) {
         showToast: false,
         toastMessage: '',
         passphraseRevealed: false,
-        passphraseAcknowledged: false,
         passphraseGenerated: false,
         minPassphraseLength,
 
@@ -32,11 +31,6 @@ export function sniptoidComponent(minPassphraseLength = 20) {
 
             if (this.passphrase.length < this.minPassphraseLength) {
                 this.showToastMessage(this.t('Passphrase must be at least :count characters.', { ':count': this.minPassphraseLength }));
-                return;
-            }
-
-            if (this.passphraseGenerated && !this.passphraseAcknowledged) {
-                this.showToastMessage(this.t('Reveal or copy your passphrase first.'));
                 return;
             }
 
@@ -56,7 +50,6 @@ export function sniptoidComponent(minPassphraseLength = 20) {
 
                 this.passphrase = '';
                 this.passphraseGenerated = false;
-                this.passphraseAcknowledged = false;
                 this.passphraseRevealed = false;
             } catch (err) {
                 console.error('Snipto ID derivation failed:', err);
@@ -69,31 +62,25 @@ export function sniptoidComponent(minPassphraseLength = 20) {
         async generatePassphrase() {
             this.passphrase = await window.generateDicewarePassphrase();
             this.passphraseGenerated = true;
-            // Sticky reveal: if the user already chose to reveal, keep it revealed across regenerations
-            // and treat the new passphrase as acknowledged since it is already on screen.
-            this.passphraseAcknowledged = this.passphraseRevealed;
+            // Auto-reveal: the user can immediately see what was generated.
+            this.passphraseRevealed = true;
         },
 
         onPassphraseInput() {
             // Manual edits clear the "generated" gate — the user knows what they typed.
             if (this.passphraseGenerated) {
                 this.passphraseGenerated = false;
-                this.passphraseAcknowledged = false;
             }
         },
 
         togglePassphraseReveal() {
             this.passphraseRevealed = !this.passphraseRevealed;
-            if (this.passphraseRevealed) {
-                this.passphraseAcknowledged = true;
-            }
         },
 
         copyPassphrase() {
             if (!this.passphrase) return;
             navigator.clipboard.writeText(this.passphrase)
                 .then(() => {
-                    this.passphraseAcknowledged = true;
                     this.showToastMessage(this.t('Copied to clipboard!'));
                 })
                 .catch(() => {
