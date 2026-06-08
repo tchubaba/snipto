@@ -59,6 +59,13 @@ crowdsec-setup:
 # Production deployment — generates fresh Cloudflare IP config then starts containers
 # =============================================================================
 prod-deploy:
+	@echo "Checking CrowdSec bouncer configuration..."
+	@if [ ! -f docker/crowdsec/crowdsec-openresty-bouncer.conf ]; then \
+		echo "Missing CrowdSec bouncer config. Starting crowdsec to generate it..."; \
+		docker compose -f docker-compose.prod.yml $(PROFILE_FLAG) up -d crowdsec; \
+		sleep 3; \
+		./docker/crowdsec-setup.sh; \
+	fi
 	@echo "Generating fresh Cloudflare IP ranges..."
 	@./docker/generate-cloudflare-nginx-config.sh
 	@echo ""
