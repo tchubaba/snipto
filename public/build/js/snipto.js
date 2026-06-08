@@ -56,7 +56,6 @@ export function sniptoComponent() {
         sniptoIdPrefix: '',
         showSniptoIdPrompt: false,
         passwordRevealed: false,
-        passwordAcknowledged: false,
         passwordGenerated: false,
         passwordNonceHex: null,
         showLanguageWarningModal: false,
@@ -497,11 +496,6 @@ export function sniptoComponent() {
             if (finalProtectionType === 2) {
                 if (this.protectionPassword.length < 12) {
                     this.showToastMessage(this.t('Password must be at least 12 characters long.'));
-                    return;
-                }
-
-                if (this.passwordGenerated && !this.passwordAcknowledged) {
-                    this.showToastMessage(this.t('Reveal or copy your passphrase first.'));
                     return;
                 }
 
@@ -1018,30 +1012,24 @@ export function sniptoComponent() {
         async generatePassword() {
             this.protectionPassword = await window.generateDicewarePassphrase();
             this.passwordGenerated = true;
-            // Sticky reveal: if the user already chose to reveal, keep it revealed across regenerations
-            // and treat the new password as acknowledged since it is already on screen.
-            this.passwordAcknowledged = this.passwordRevealed;
+            // Auto-reveal: the user can immediately see what was generated.
+            this.passwordRevealed = true;
         },
 
         onPasswordInput() {
             if (this.passwordGenerated) {
                 this.passwordGenerated = false;
-                this.passwordAcknowledged = false;
             }
         },
 
         togglePasswordReveal() {
             this.passwordRevealed = !this.passwordRevealed;
-            if (this.passwordRevealed) {
-                this.passwordAcknowledged = true;
-            }
         },
 
         copyPassword() {
             if (!this.protectionPassword) return;
             navigator.clipboard.writeText(this.protectionPassword)
                 .then(() => {
-                    this.passwordAcknowledged = true;
                     this.showToastMessage(this.t('Copied to clipboard!'));
                 })
                 .catch(() => {

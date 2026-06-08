@@ -24,7 +24,6 @@
                 'Okay — could be stronger' => __('Okay — could be stronger'),
                 'Good' => __('Good'),
                 'Strong' => __('Strong'),
-                'Reveal or copy your passphrase first.' => __('Reveal or copy your passphrase first.'),
                 'Copying failed. Please copy manually.' => __('Copying failed. Please copy manually.'),
             ]);
         @endphp
@@ -140,14 +139,10 @@
                            x-text="passphraseStrength() < 3 ? t('Weak — easy to crack') : (passphraseStrength() < 4 ? t('Okay — could be stronger') : (passphraseStrength() < 5 ? t('Good') : t('Strong')))">
                         </p>
                     </div>
-                    <p x-show="passphraseGenerated && !passphraseAcknowledged" x-cloak
-                       class="text-xs text-orange-500 dark:text-orange-400 mt-1">
-                        {{ __('Reveal or copy your passphrase first.') }}
-                    </p>
                 </div>
 
                 <button @click="deriveSniptoid()"
-                        :disabled="loading || passphrase.length < minPassphraseLength || (passphraseGenerated && !passphraseAcknowledged)"
+                        :disabled="loading || passphrase.length < minPassphraseLength"
                         class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                     <span x-show="!loading">{!! __('Generate Snipto ID') !!}</span>
                     <span x-show="loading" x-cloak class="flex items-center justify-center space-x-2">

@@ -53,7 +53,6 @@
                 'Passphrase must be at least 20 characters.' => __('Passphrase must be at least 20 characters.'),
                 'Your browser does not support this feature. Please update your browser.' => __('Your browser does not support this feature. Please update your browser.'),
                 'You have been temporarily locked out. Please check back later.' => __('You have been temporarily locked out. Please check back later.'),
-                'Reveal or copy your passphrase first.' => __('Reveal or copy your passphrase first.'),
             ]);
         @endphp
     </script>
@@ -333,10 +332,6 @@
                                             class="text-indigo-500 hover:underline">
                                         {{ __('Generate for me') }}
                                     </button>
-                                    <span x-show="passwordGenerated && !passwordAcknowledged" x-cloak
-                                          class="text-orange-500 dark:text-orange-400">
-                                        {{ __('Reveal or copy your passphrase first.') }}
-                                    </span>
                                 </div>
                             </div>
 

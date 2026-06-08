@@ -1,0 +1,5 @@
+# crowdsec/acquis.yaml — Tells CrowdSec which log files to parse
+filenames:
+  - /var/log/nginx/crowdsec.access.log
+labels:
+  type: nginx

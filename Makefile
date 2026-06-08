@@ -11,14 +11,14 @@ ifeq ($(MODE),production)
     DC = docker compose -f docker-compose.prod.yml $(PROFILE_FLAG)
     EXEC = $(DC) exec app
 else
-    DC = docker compose -f docker-compose.dev.yml $(PROFILE_FLAG)
+    DC = docker compose $(PROFILE_FLAG)
     EXEC = $(DC) exec app
 endif
 
 ARTISAN = $(EXEC) php artisan
 
 # Targets
-.PHONY: up down build restart prod-up prod-down prod-build prod-deploy artisan composer npm shell test grumphp fix lint logs fresh
+.PHONY: up down build restart prod-up prod-down prod-build prod-deploy crowdsec-setup artisan composer npm shell test grumphp fix lint logs fresh
 
 # =============================================================================
 # Development targets (default mode)
@@ -47,6 +47,13 @@ prod-down:
 
 prod-build:
 	docker compose -f docker-compose.prod.yml $(PROFILE_FLAG) build
+
+# =============================================================================
+# CrowdSec initial setup — one-time machine registration and API key generation
+# Run this once after first deployment to register the agent with LAPI
+# =============================================================================
+crowdsec-setup:
+	@./docker/crowdsec-setup.sh
 
 # =============================================================================
 # Production deployment — generates fresh Cloudflare IP config then starts containers
