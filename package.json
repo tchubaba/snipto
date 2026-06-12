@@ -7,13 +7,13 @@
         "dev": "vite"
     },
     "devDependencies": {
-        "@tailwindcss/vite": "^4.1.13",
+        "@tailwindcss/vite": "^4.3.1",
         "axios": "^1.11.0",
         "concurrently": "^9.0.1",
-        "laravel-vite-plugin": "^2.0.0",
+        "laravel-vite-plugin": "^3.1.0",
         "tailwindcss": "^4.1.13",
-        "vite": "^7.0.4",
-        "vite-plugin-static-copy": "^3.1.2"
+        "vite": "^8.0.16",
+        "vite-plugin-static-copy": "^3.4.0"
     },
     "dependencies": {
         "@alpinejs/csp": "^3.15.0",
