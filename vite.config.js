@@ -48,7 +48,6 @@ export default defineConfig({
                 entryFileNames: 'js/[name]-[hash].js',
             },
         },
-        minify: 'esbuild',
         chunkSizeWarningLimit: 600,
     },
 });
