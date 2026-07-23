@@ -91,8 +91,8 @@
 
     <!-- Alpine script for dropdown -->
     <script @cspNonce>
-        function localeDropdown() {
-            return {
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('localeDropdown', () => ({
                 open: false,
                 locales: @json(config('app.supported_locales')),
                 locale: "{{ session('locale', config('app.locale')) }}",
@@ -106,8 +106,8 @@
                         event.target.submit();
                     }
                 }
-            }
-        }
+            }));
+        });
     </script>
 </header>
 

@@ -190,4 +190,10 @@ export function sniptoidComponent(minPassphraseLength = 20) {
     };
 }
 
-window.sniptoidComponent = sniptoidComponent;
+if (window.Alpine) {
+    window.Alpine.data('sniptoidComponent', sniptoidComponent);
+} else {
+    document.addEventListener('alpine:init', () => {
+        window.Alpine.data('sniptoidComponent', sniptoidComponent);
+    });
+}

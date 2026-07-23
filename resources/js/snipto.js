@@ -1227,4 +1227,10 @@ export function sniptoComponent() {
     };
 }
 
-window.sniptoComponent = sniptoComponent;
+if (window.Alpine) {
+    window.Alpine.data('sniptoComponent', sniptoComponent);
+} else {
+    document.addEventListener('alpine:init', () => {
+        window.Alpine.data('sniptoComponent', sniptoComponent);
+    });
+}
