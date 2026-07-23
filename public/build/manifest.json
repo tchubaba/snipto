@@ -1,7 +1,7 @@
 {
-  "_chunk-QTnfLwEv.js": {
-    "file": "assets/chunk-QTnfLwEv.js",
-    "name": "chunk"
+  "_rolldown-runtime-QTnfLwEv.js": {
+    "file": "assets/rolldown-runtime-QTnfLwEv.js",
+    "name": "rolldown-runtime"
   },
   "node_modules/flag-icons/flags/4x3/br.svg": {
     "file": "assets/br-Cu5YU29T.svg",
@@ -24,7 +24,7 @@
     "src": "node_modules/flag-icons/flags/4x3/us.svg"
   },
   "resources/css/app.css": {
-    "file": "assets/app-rMkV_7bi.css",
+    "file": "assets/app-B9j8jwEy.css",
     "name": "app",
     "names": [
       "app.css"
@@ -40,21 +40,21 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "js/app-Cd-1mJMB.js",
+    "file": "js/app-DYwpauh-.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "imports": [
-      "_chunk-QTnfLwEv.js"
+      "_rolldown-runtime-QTnfLwEv.js"
     ]
   },
   "resources/js/sodium-bundle.js": {
-    "file": "js/sodium-bundle-wmymGX7j.js",
+    "file": "js/sodium-bundle-ClGHIzf3.js",
     "name": "sodium-bundle",
     "src": "resources/js/sodium-bundle.js",
     "isEntry": true,
     "imports": [
-      "_chunk-QTnfLwEv.js"
+      "_rolldown-runtime-QTnfLwEv.js"
     ]
   }
 }

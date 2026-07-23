@@ -122,8 +122,8 @@
                             <span x-text="passphrase.length"></span> / <span x-text="minPassphraseLength"></span> {{ __('characters minimum') }}
                         </span>
                     </div>
-                    <p class="text-xs text-gray-400 dark:text-gray-500">
-                        {{ __('Use 6+ random words or a long unique phrase — not a password you reuse.') }}
+                    <p class="text-base text-center text-gray-500 dark:text-gray-400">
+                        {!! __('Use 6+ random words or a long unique phrase — <strong>NEVER</strong> share your passphrase with anyone') !!}
                     </p>
                     <div x-show="passphrase.length >= minPassphraseLength" x-cloak class="mt-1">
                         <div class="flex gap-1 h-1">

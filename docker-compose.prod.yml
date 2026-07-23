@@ -1,5 +1,6 @@
 services:
   app:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: docker/Dockerfile-fpm
@@ -25,6 +26,7 @@ services:
       - sail
 
   nginx:
+    restart: unless-stopped
     image: crowdsecurity/openresty:latest
     container_name: snipto-nginx-1
     ports:
@@ -48,6 +50,7 @@ services:
       - sail
 
   mariadb:
+    restart: unless-stopped
     image: 'mariadb:11'
     profiles: ["with-db"]
     ports:
@@ -73,6 +76,7 @@ services:
 
   # CrowdSec agent — parses nginx logs, detects attacks, creates ban decisions
   crowdsec:
+    restart: unless-stopped
     image: crowdsecurity/crowdsec:latest
     container_name: snipto-crowdsec-1
     environment:

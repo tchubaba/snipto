@@ -177,7 +177,7 @@
     "In all cases, only someone with the correct key can decrypt the Snipto.": "Dans tous les cas, seule une personne possédant la bonne clé peut déchiffrer le Snipto.",
     "Important: Double-check the recipient’s Snipto ID. If you enter it incorrectly, they will not be able to decrypt or read your message.": "Important : Vérifiez bien le Snipto ID du destinataire. Si vous le saisissez de manière incorrecte, il ne pourra ni déchiffrer ni lire votre message.",
     "Invalid Snipto ID format.": "Format de Snipto ID non valide.",
-    "Use 6+ random words or a long unique phrase — not a password you reuse.": "Utilisez au moins 6 mots aléatoires ou une longue phrase unique — pas un mot de passe que vous réutilisez.",
+    "Use 6+ random words or a long unique phrase — <strong>NEVER</strong> share your passphrase with anyone": "Utilisez au moins 6 mots aléatoires ou une longue phrase unique — ne partagez <strong>JAMAIS</strong> votre phrase secrète avec personne.",
     "Generate for me": "Générer pour moi",
     "Show": "Afficher",
     "Hide": "Masquer",
