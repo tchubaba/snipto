@@ -3,9 +3,9 @@
 ## Supported Versions
 
 | Version | Supported          |
-| ------- | ------------------ |
-| 1.8.0   | :white_check_mark: |
-| < 1.8.0 | :x:                |
+|---------| ------------------ |
+| 1.9.4   | :white_check_mark: |
+| < 1.9.4 | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -30,7 +30,7 @@ Snipto is designed with a **zero-knowledge, end-to-end encrypted** model by defa
 
 ### Zero-Knowledge Principle
 
-*   **Server Never Seys Keys:** For Secret, Password, and Snipto ID modes, the server never receives the user's passphrase, password, or private keys.
+*   **Server Never Sees Keys:** For Secret, Password, and Snipto ID modes, the server never receives the user's passphrase, password, or private keys.
 *   **Encryption is Client-Side:** All cryptographic operations (Argon2id key derivation, AES-256-GCM encryption, X25519 ECDH) are performed in the user's browser using WebAssembly (libsodium) or the WebCrypto API.
 *   **Payloads are Ciphertext:** The server only stores encrypted payloads. Without the client-side key, the data is mathematically inaccessible.
 
