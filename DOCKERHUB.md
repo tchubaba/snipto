@@ -84,6 +84,19 @@ Terminate TLS at your proxy (Caddy, Traefik, nginx) and forward to port `8080`. 
 - `latest` — most recent stable release
 - `vX.Y.Z` — pinned version (e.g. `v1.2.2`)
 
+### Secure Deployment (Recommended)
+
+For maximum security, we strongly recommend deploying Snipto using the image's immutable `sha256` digest rather than mutable tags like `latest`.
+
+Our images are cryptographically signed using Sigstore/Cosign. You can verify the integrity and origin of the image using:
+
+```bash
+cosign verify \
+  --certificate-identity-regexp "https://github.com/tchubaba/snipto/.*" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  tchubaba/snipto:latest
+```
+
 ---
 
 ## Source & support

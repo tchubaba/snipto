@@ -1,4 +1,4 @@
-FROM php:8.5-cli
+FROM php:8.5-cli@sha256:0e17ef0527f296b85bfe4cfb5219b29cafc37224857ed73d28628ea142930ac8
 
 USER root
 
@@ -38,11 +38,14 @@ RUN if [ "$APP_ENV" = "local" ]; then \
 fi
 
 # Install Node.js (needed for building assets)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+RUN mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
     && apt-get install -y nodejs
 
 # Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+COPY --from=composer:latest@sha256:4d71c3c2109c61d5415544264b59ad4087e4c5b7244481723664138fd36d5040 /usr/bin/composer /usr/bin/composer
 
 # Create system user to run Composer and Artisan Commands
 # Robust check to prevent build failure if UID exists
@@ -79,7 +82,7 @@ RUN if [ "$APP_ENV" = "local" ]; then \
         echo "Local/development build — deferring composer install and asset build to entrypoint."; \
     else \
         composer install --no-dev --optimize-autoloader --no-interaction \
-        && npm install \
+        && npm ci \
         && npm run build \
         && rm -rf node_modules \
         && touch vendor/.snipto-baked; \
