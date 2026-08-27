@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
+use Illuminate\Support\Facades\DB;
 
 class SniptoApiTest extends TestCase
 {
@@ -344,5 +345,33 @@ class SniptoApiTest extends TestCase
         $this->assertNotNull($snipto);
         // Verify expiration is approximately 1 week from now (within 5 minutes tolerance)
         $this->assertTrue($snipto->expires_at->greaterThan(Carbon::now()->addDays(6)));
+    }
+    #[Test]
+    public function it_uses_a_transaction_and_pessimistic_locking_for_atomic_read_and_delete()
+    {
+        Snipto::create([
+            'slug'            => 'atomic-test',
+            'payload'         => 'content',
+            'protection_type' => ProtectionType::Plaintext,
+            'expires_at'      => Carbon::now()->addHour(),
+            'views_remaining' => 1,
+        ]);
+
+        DB::enableQueryLog();
+
+        $response = $this->getJson('/api/snipto/atomic-test');
+        $response->assertStatus(200);
+
+        $queryLog         = DB::getQueryLog();
+        $hasLockForUpdate = false;
+
+        foreach ($queryLog as $log) {
+            if (str_contains(strtolower($log['query']), 'for update') && str_contains(strtolower($log['query']), 'sniptos')) {
+                $hasLockForUpdate = true;
+                break;
+            }
+        }
+
+        $this->assertTrue($hasLockForUpdate, 'The query did not use pessimistic locking (lockForUpdate).');
     }
 }
