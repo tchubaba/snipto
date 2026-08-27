@@ -31,7 +31,7 @@ services:
         networks:
             - sail
     mariadb:
-        image: 'mariadb:11'
+        image: 'mariadb:11@sha256:2439dcd7d14010ecd1ff7a4e1c5abe8e208c34fe35290744deeeaac3569043c3'
         profiles: ["with-db"]
         ports:
             - '${FORWARD_DB_PORT:-3306}:3306'
