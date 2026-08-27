@@ -132,6 +132,20 @@ Visit `http://localhost:8080` to start sharing snippets.
 
 **Note:** For persistence, it is recommended to mount a volume for the SQLite database so your data survives container updates. For high-traffic environments, you should probably connect to an external MariaDB/MySQL instance.
 
+### Production Deployment Security
+
+For a security-focused application like Snipto, supply chain integrity is critical. While the `latest` tag is provided for convenience, we strongly recommend deploying Snipto using one of the following secure methods:
+
+1. **Pin by Image Digest (Recommended):** Instead of using a mutable tag like `latest` or `v1.2.3`, pin your deployment to the exact `sha256` digest of the image. This guarantees that the image you run is exactly what we published and prevents upstream tampering.
+2. **Verify the Image Signature:** Our Docker images are cryptographically signed via Sigstore/Cosign during the GitHub Actions build process. You can verify the integrity and origin of the image using:
+   ```bash
+   cosign verify \
+     --certificate-identity-regexp "https://github.com/tchubaba/snipto/.*" \
+     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+     tchubaba/snipto:latest
+   ```
+3. **Build from Source:** For the highest level of trust, clone this repository and build the Docker image yourself. The provided Dockerfiles use strict multi-stage builds, pin base images by digest, and use lockfile-based `npm ci` builds.
+
 ---
 
 ### Local Development (GitHub Clone)
