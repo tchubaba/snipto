@@ -18,21 +18,24 @@ endif
 ARTISAN = $(EXEC) php artisan
 
 # Targets
-.PHONY: up down build restart prod-up prod-down prod-build prod-deploy crowdsec-setup artisan composer npm shell test grumphp fix lint logs fresh
+.PHONY: init-env up down build restart prod-up prod-down prod-build prod-deploy crowdsec-setup artisan composer npm shell test grumphp fix lint logs fresh
 
 # =============================================================================
 # Development targets (default mode)
 # =============================================================================
-up:
+init-env:
+	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example"; fi
+
+up: init-env
 	$(DC) up -d
 
 down:
 	$(DC) down
 
-build:
+build: init-env
 	$(DC) build
 
-restart:
+restart: init-env
 	$(DC) down
 	$(DC) up -d
 

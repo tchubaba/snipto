@@ -37,6 +37,9 @@ RUN if [ "$APP_ENV" = "local" ]; then \
     docker-php-ext-enable xdebug; \
 fi
 
+# Ensure PHP parses environment variables (fixes missing env vars in php artisan serve)
+RUN echo 'variables_order = "EGPCS"' > /usr/local/etc/php/conf.d/docker-php-env.ini
+
 # Install Node.js (needed for building assets)
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
