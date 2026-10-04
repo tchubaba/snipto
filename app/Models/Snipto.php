@@ -96,12 +96,25 @@ class Snipto extends Model
         return $viewRemaining;
     }
 
+    public function getProtectionType(): ProtectionType
+    {
+        return $this->protection_type;
+    }
+
     /**
      * Indicates whether the Snipto payload is encrypted.
      */
     public function isEncrypted(): bool
     {
         return $this->protection_type !== ProtectionType::Plaintext;
+    }
+
+    /**
+     * Indicates whether the Snipto payload is protected by a URL secret.
+     */
+    public function isUrlSecret(): bool
+    {
+        return $this->protection_type === ProtectionType::Secret;
     }
 
     /**

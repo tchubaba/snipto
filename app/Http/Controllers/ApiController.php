@@ -63,10 +63,13 @@ class ApiController extends Controller
             $keyHash = $request->string('key_hash')->toString();
 
             if (empty($keyHash)) {
+                // If we have an empty hash, this means this is a pre-decryption request, which should
+                // return non-secret data related to the snippet, according to the protection method
+                // selected by the sender.
                 $response = [
                     'success'         => true,
                     'exists'          => true,
-                    'protection_type' => $snipto->protection_type->value,
+                    'protection_type' => $snipto->getProtectionType()->value,
                 ];
 
                 // Snipto ID mode derives key_hash from the ECDH shared secret between the
@@ -93,7 +96,7 @@ class ApiController extends Controller
                 // Same chicken-and-egg problem as Password mode: the client needs the nonce to derive
                 // the correct key_hash before it can present a valid one. The nonce is an IV/salt, not
                 // a secret.
-                if ($snipto->protection_type === ProtectionType::Secret) {
+                if ($snipto->isUrlSecret()) {
                     $response['nonce'] = $snipto->nonce;
                 }
 
