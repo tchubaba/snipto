@@ -35,7 +35,7 @@
         [x-cloak] { display: none !important; }
     </style>
 
-    <div class="flex flex-col items-center w-full">
+    <div class="my-auto flex flex-col items-center w-full">
     <div class="max-w-xl w-full rounded-xl p-6 space-y-6
             shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
             transition-colors duration-300"

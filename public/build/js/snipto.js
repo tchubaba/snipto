@@ -29,6 +29,12 @@ export function sniptoComponent() {
         showSuccess: false,
         errorMessage: '',
         userInput: '',
+        // Create-form editor. Never affects the payload view.
+        editorFocused: false,
+        editorLine: 1,
+        editorCol: 1,
+        editorLineHeights: [],
+        editorGutterFrame: null,
         fullUrl: '',
         showToast: false,
         toastMessage: '',
@@ -95,6 +101,10 @@ export function sniptoComponent() {
             if (this.calledInit) return;
             this.calledInit = true;
 
+            // Keep the line-number gutter in step with the document. Registered
+            // once here; the textarea is the only writer in 'gutter' mode.
+            this.$watch('userInput', () => this.scheduleGutterSync());
+
             // Initialize Trusted Types policy for srcdoc
             if (window.trustedTypes && trustedTypes.createPolicy) {
                 this.trustedTypesPolicy = trustedTypes.createPolicy('snipto-srcdoc', {
@@ -102,9 +112,14 @@ export function sniptoComponent() {
                 });
             }
 
-            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                document.documentElement.classList.add('dark');
-            }
+            // The theme itself is already settled by the head script in
+            // layouts/main.blade.php before this runs, and re-deriving it from
+            // prefers-color-scheme here would silently undo a stored light
+            // preference on a device set to dark. All that is left is keeping an
+            // already-rendered snippet in step when the theme changes under it.
+            const onThemeChange = (event) => this.applyPayloadTheme(event.detail);
+            window.addEventListener('snipto:theme-change', onThemeChange);
+            this.cleanupFunctions.push(() => window.removeEventListener('snipto:theme-change', onThemeChange));
 
             this.cryptoSupported = await supportsLibsodium();
 
@@ -113,7 +128,7 @@ export function sniptoComponent() {
                 this.protectionType = 1;
                 this.loading = false;
                 this.loadBlacklist();
-                this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
+                this.$nextTick(() => setTimeout(() => this.initEditor(), 100));
                 return;
             }
 
@@ -136,7 +151,7 @@ export function sniptoComponent() {
                     this.showForm = true;
                     this.protectionType = 1;
                     this.loadBlacklist();
-                    this.$nextTick(() => setTimeout(() => this.$refs.textarea?.focus(), 100));
+                    this.$nextTick(() => setTimeout(() => this.initEditor(), 100));
                     return;
                 } else if (res.status === 429) {
                     this.handleThrottling(res, true);
@@ -321,10 +336,21 @@ export function sniptoComponent() {
                     document.querySelector('meta[name="csrf-token"]')?.getAttribute('nonce') ||
                     '';
 
-                const isDark = document.documentElement.classList.contains('dark');
-                const textColor = isDark ? '#f3f4f6' : '#111827';
+                const textColor = this.payloadTextColor();
 
-                // Build srcdoc
+                // Build srcdoc.
+                //
+                // The colour is declared on the root only, never on body. Colour
+                // is inherited, so body and the pre pick it up from html — which
+                // is what lets one inline write on the iframe's root re-theme the
+                // whole document in place (see applyPayloadTheme). Declaring it on
+                // body as well would pin the value baked in at render time: an
+                // inline style on the root outranks the stylesheet, but nothing
+                // reaches body underneath it.
+                //
+                // Keep comments about this markup out of the CSS itself: it is a
+                // JS template literal, so '//' is not a comment and a backtick
+                // would close the string. Both silently wreck the generated sheet.
                 const srcdoc = `
             <!DOCTYPE html>
             <html>
@@ -336,8 +362,11 @@ export function sniptoComponent() {
                         padding: 0;
                         display: block;
                         width: 100%;
-                        color: ${textColor};
                         overflow: hidden;
+                    }
+
+                    html {
+                        color: ${textColor};
                     }
 
                     pre {
@@ -434,6 +463,14 @@ export function sniptoComponent() {
                 };
 
                 iframe.addEventListener('load', () => {
+                    // A theme change that fired while this document was still
+                    // loading would have been written to the pre-load document and
+                    // thrown away, leaving the colour baked into the srcdoc — which
+                    // can then sit mismatched against the page background behind
+                    // it. Re-apply once the real document is in place. When nothing
+                    // changed mid-load this writes the value the srcdoc already has,
+                    // so there is no flash.
+                    this.applyPayloadTheme(this.currentTheme());
                     adjustHeight();
                     try {
                         const root = iframe.contentDocument && iframe.contentDocument.documentElement;
@@ -464,8 +501,351 @@ export function sniptoComponent() {
             }
         },
 
+        // 'dark' or 'light', read back from the class the whole site keys off.
+        // Only ever returns those two strings, so it doubles as the source of
+        // truth when there is no event detail to trust.
+        currentTheme() {
+            return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        },
+
+        // Text colour for the snippet inside the sandboxed iframe. That iframe is
+        // a separate document, so it inherits nothing from the page's Tailwind
+        // classes; it reads the same .dark class the rest of the site keys off.
+        // Kept in one place because the value is baked into the srcdoc at render
+        // time and also applied live on a theme change.
+        payloadTextColor(theme) {
+            return (theme || this.currentTheme()) === 'dark' ? '#f3f4f6' : '#111827';
+        },
+
+        // Re-theming while a snippet is on screen must not re-render it: the
+        // payload has already been consumed and there is nothing to fetch again.
+        // The iframe is same-origin (sandbox="allow-same-origin"), so patch its
+        // document directly. Writing the root's inline colour is not blocked by
+        // that document's own CSP — style-src only gates <style> elements and
+        // style attributes that the parser sees, not CSSOM assignment — and it
+        // cascades down to the <pre> because the srcdoc declares the colour on
+        // <html> only.
+        applyPayloadTheme(theme) {
+            // 'snipto:theme-change' is a plain window event, so any script on the
+            // page — an extension, or an XSS that already landed — can dispatch it
+            // with any detail it likes. Accept only our own two values and ignore
+            // everything else rather than coercing it, so a hostile detail can
+            // never steer the write into the payload document.
+            if (theme !== 'dark' && theme !== 'light') return;
+
+            const iframe = document.getElementById(this.contentHostId);
+            if (!iframe) return;
+            let root = null;
+            try {
+                root = iframe.contentDocument && iframe.contentDocument.documentElement;
+            } catch (e) {
+                return;
+            }
+            if (root) root.style.color = this.payloadTextColor(theme);
+        },
+
+        // ---------------------------------------------------------------------
+        // Create-form editor
+        //
+        // 'gutter' mode keeps a native <textarea> — so mobile keyboards, IME,
+        // autocorrect and clipboard all stay native — and we draw the line
+        // numbers ourselves. The textarea soft-wraps, which means one logical
+        // line can occupy several visual lines; a fixed gutter row height would
+        // therefore drift out of alignment. We measure each logical line's
+        // wrapped height in an offscreen mirror and give the matching gutter row
+        // that exact height, which keeps the numbers aligned without giving up
+        // word wrap.
+        // ---------------------------------------------------------------------
+        initEditor() {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+
+            textarea.focus();
+            this.applyEditorHeight();
+            this.observeEditorLayout();
+            this.syncGutter();
+
+            const gutter = this.$refs.gutter;
+            const onScroll = () => {
+                if (gutter) gutter.scrollTop = textarea.scrollTop;
+                this.updateActiveLine();
+            };
+            textarea.addEventListener('scroll', onScroll, { passive: true });
+            this.cleanupFunctions.push(() => textarea.removeEventListener('scroll', onScroll));
+
+            // A resize changes the wrap width, so every logical line has to be
+            // re-measured against the new content width.
+            const onResize = () => {
+                this.applyEditorHeight();
+                this.scheduleGutterSync();
+            };
+            window.addEventListener('resize', onResize);
+            this.cleanupFunctions.push(() => window.removeEventListener('resize', onResize));
+        },
+
+        // Coalesce bursts of edits (typing, pasting) into one measurement pass.
+        scheduleGutterSync() {
+            if (this.editorGutterFrame) cancelAnimationFrame(this.editorGutterFrame);
+            this.editorGutterFrame = requestAnimationFrame(() => {
+                this.editorGutterFrame = null;
+                this.syncGutter();
+            });
+        },
+
+        // The editor takes whatever vertical space the card has left after the
+        // heading, the counter strip and the whole controls block beneath it.
+        // Both sides of that subtraction need care: the "everything else" figure
+        // is taken as card height minus editor height, which cancels the editor
+        // out and so cannot feed its own height back in; and the space available
+        // has to come from the viewport rather than from main's box, which grows
+        // around a card that no longer fits. See applyEditorHeight().
+        // Only a fallback: the real floor is the --editor-min-height custom
+        // property, which the short-window media query lowers along with the
+        // copy it drops there. Keeping it in CSS means one place decides both.
+        // There is no maximum on purpose — the card is meant to fill the
+        // viewport however tall it is, and the editor is what flexes.
+        EDITOR_MIN_HEIGHT_FALLBACK: 200,
+
+        applyEditorHeight() {
+            const shell = this.$refs.editorShell;
+            const card = this.$refs.card;
+            const main = card ? card.closest('main') : null;
+            if (!shell || !card || !main) return;
+
+            const mainStyles = getComputedStyle(main);
+            const padY = parseFloat(mainStyles.paddingTop || 0)
+                + parseFloat(mainStyles.paddingBottom || 0);
+            const mainBox = main.clientHeight - padY;
+            // main is a flex-1 item in a min-h-screen column, so once the card
+            // is taller than the viewport main grows to fit it and its own
+            // clientHeight contains the card's height. Feeding that back in
+            // makes the result self-referential and it settles wherever history
+            // left it. The viewport is the real limit, so take the smaller box:
+            // the two agree while the card fits, and the viewport one is right
+            // once it doesn't.
+            const available = Math.min(mainBox, window.innerHeight - padY);
+
+            const chrome = card.getBoundingClientRect().height - shell.getBoundingClientRect().height;
+            if (available <= 0 || chrome <= 0) return;
+
+            const floor = parseFloat(getComputedStyle(shell).getPropertyValue('--editor-min-height'));
+            shell.style.height = Math.max(
+                Number.isFinite(floor) && floor > 0 ? floor : this.EDITOR_MIN_HEIGHT_FALLBACK,
+                available - chrome
+            ) + 'px';
+        },
+
+        // Switching protection mode changes how tall the controls block is —
+        // Password and Snipto ID add inputs, expiry pickers and warnings — so
+        // the leftover space has to be recomputed when that content resizes.
+        observeEditorLayout() {
+            const card = this.$refs.card;
+            const shell = this.$refs.editorShell;
+            if (!card || !shell || typeof ResizeObserver === 'undefined') return;
+
+            // Trailing debounce. Switching protection mode animates the extra
+            // inputs in, so the card keeps changing size for a few hundred ms;
+            // measuring on the trailing edge gives the settled layout instead of
+            // a frame mid-transition. It converges rather than looping: once the
+            // height is right, writing it changes nothing and the observer stops
+            // firing.
+            let timer = null;
+            const observer = new ResizeObserver(() => {
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(() => {
+                    timer = null;
+                    this.applyEditorHeight();
+                }, 120);
+            });
+            observer.observe(card);
+            this.cleanupFunctions.push(() => {
+                if (timer) clearTimeout(timer);
+                observer.disconnect();
+            });
+        },
+
+        // Above this many logical lines we stop measuring per line and fall back
+        // to a uniform row height. Line numbers stay correct; only the alignment
+        // of wrapped lines past the cap can drift, and only for pathological
+        // pastes. Measuring tens of thousands of rows per keystroke is not free.
+        GUTTER_MEASURE_LIMIT: 5000,
+
+        syncGutter() {
+            const gutter = this.$refs.gutter;
+            const textarea = this.$refs.textarea;
+            if (!gutter || !textarea) return;
+
+            const lines = this.userInput.split('\n');
+
+            // The form is hidden (zero-size box) — nothing measurable yet.
+            if (textarea.clientWidth === 0) return;
+
+            const styles = getComputedStyle(textarea);
+            const contentWidth = textarea.clientWidth
+                - parseFloat(styles.paddingLeft || 0)
+                - parseFloat(styles.paddingRight || 0);
+            if (contentWidth <= 0) return;
+
+            const lineHeight = parseFloat(styles.lineHeight) || parseFloat(styles.fontSize) || 16;
+            const measure = lines.length <= this.GUTTER_MEASURE_LIMIT;
+
+            const mirror = this.ensureMirror(textarea, styles);
+            mirror.style.width = contentWidth + 'px';
+
+            // Build the mirror with one child per logical line, then read every
+            // child's height in a single layout pass.
+            const rows = gutter.children;
+            while (gutter.children.length > lines.length) gutter.removeChild(gutter.lastChild);
+            mirror.textContent = '';
+
+            const mirrorRows = [];
+            for (let i = 0; i < lines.length; i++) {
+                const probe = document.createElement('div');
+                probe.className = 'editor-mirror-row';
+                // A non-breaking space gives an empty line a line box to measure;
+                // a plain space would be collapsed away at the end of a run.
+                probe.textContent = lines[i] === '' ? '\u00a0' : lines[i];
+                mirror.appendChild(probe);
+                mirrorRows.push(probe);
+            }
+
+            // Single reflow: heights are read after all rows exist.
+            const heights = measure ? mirrorRows.map(row => row.offsetHeight) : null;
+
+            // Cache derived geometry, never the text itself — the active-line
+            // band needs the same numbers the gutter is sized from, and keeping
+            // heights rather than lines is the same trade the existing
+            // lineWidths field makes.
+            this.editorLineHeights = heights
+                ? heights
+                : new Array(lines.length).fill(lineHeight);
+
+            for (let i = 0; i < lines.length; i++) {
+                let row = rows[i];
+                if (!row) {
+                    row = document.createElement('div');
+                    row.className = 'editor-gutter-row';
+                    gutter.appendChild(row);
+                }
+                if (row.textContent !== String(i + 1)) row.textContent = String(i + 1);
+                row.style.height = this.editorLineHeights[i] + 'px';
+            }
+
+            mirror.textContent = '';
+            this.updateActiveLine();
+        },
+
+        // Offscreen twin of the textarea. Font metrics are copied from the real
+        // element so the measured wrap matches what the user actually sees.
+        ensureMirror(textarea, styles) {
+            let mirror = this.$refs.editorMirror;
+            if (!mirror) {
+                mirror = document.createElement('div');
+                mirror.className = 'editor-mirror';
+                mirror.setAttribute('aria-hidden', 'true');
+                document.body.appendChild(mirror);
+                this.$refs.editorMirror = mirror;
+                this.cleanupFunctions.push(() => mirror.remove());
+            }
+            mirror.style.fontFamily = styles.fontFamily;
+            mirror.style.fontSize = styles.fontSize;
+            mirror.style.lineHeight = styles.lineHeight;
+            mirror.style.letterSpacing = styles.letterSpacing;
+            mirror.style.tabSize = styles.tabSize;
+            return mirror;
+        },
+
+        // Position the band behind the caret's logical line. Its offset is the
+        // sum of the heights of the lines above it — the very numbers the gutter
+        // rows were sized from, so the band and the numbers cannot disagree, and
+        // a line that soft-wraps gets a band as tall as all of its visual lines.
+        updateActiveLine() {
+            const band = this.$refs.activeLine;
+            const textarea = this.$refs.textarea;
+            if (!band || !textarea) return;
+
+            const gutter = this.$refs.gutter;
+            if (gutter) {
+                const rows = gutter.children;
+                for (let i = 0; i < rows.length; i++) {
+                    rows[i].classList.toggle('is-active', i === this.editorLine - 1);
+                }
+            }
+
+            const heights = this.editorLineHeights;
+            if (!heights.length) {
+                band.style.height = '0px';
+                return;
+            }
+
+            const index = Math.max(0, Math.min(this.editorLine - 1, heights.length - 1));
+            let top = 0;
+            for (let i = 0; i < index; i++) top += heights[i] || 0;
+
+            const padTop = parseFloat(getComputedStyle(textarea).paddingTop) || 0;
+            band.style.top = (padTop + top - textarea.scrollTop) + 'px';
+            band.style.height = (heights[index] || 0) + 'px';
+        },
+
+        // Tab would move focus out of the editor; insert an indent instead.
+        insertIndent() {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const indent = '    ';
+            textarea.value = textarea.value.slice(0, start) + indent + textarea.value.slice(end);
+            textarea.selectionStart = textarea.selectionEnd = start + indent.length;
+            this.userInput = textarea.value;
+            this.updateEditorCaret();
+        },
+
+        updateEditorCaret() {
+            const textarea = this.$refs.textarea;
+            if (!textarea) return;
+            const before = textarea.value.slice(0, textarea.selectionStart);
+            const lastBreak = before.lastIndexOf('\n');
+            this.editorLine = before.split('\n').length;
+            // 1-based; with no newline before the caret lastBreak is -1, which
+            // already yields column = length + 1.
+            this.editorCol = before.length - lastBreak;
+            this.updateActiveLine();
+        },
+
+        editorCaretLabel() {
+            return this.t('Ln :line, Col :col', { ':line': this.editorLine, ':col': this.editorCol });
+        },
+
+        editorCountLabel() {
+            const chars = this.userInput.length;
+            const lines = this.userInput === '' ? 0 : this.userInput.split('\n').length;
+            const locale = (typeof navigator !== 'undefined' && navigator.language) || 'en';
+            return this.t(':count characters', { ':count': chars.toLocaleString(locale) })
+                + ' · '
+                + this.t(':count lines', { ':count': lines.toLocaleString(locale) });
+        },
+
+        // Drop the editor's plaintext buffer and its undo history. Clearing
+        // this.userInput is not enough: an editor keeps its own copy of the
+        // text, and undo history keeps earlier states of it. This mirrors the
+        // fill(0) hygiene used for the encryption buffers elsewhere.
+        clearEditor() {
+            // Clear the Alpine mirror too, so "no plaintext left in either
+            // place" holds whatever the call order is. The submit path already
+            // blanks userInput itself; this keeps clearEditor() self-sufficient.
+            this.userInput = '';
+            const textarea = this.$refs.textarea;
+            if (textarea) textarea.value = '';
+            this.scheduleGutterSync();
+        },
+
         // Cleanup method to be called when component is destroyed
         destroy() {
+            if (this.editorGutterFrame) {
+                cancelAnimationFrame(this.editorGutterFrame);
+                this.editorGutterFrame = null;
+            }
             this.cleanupFunctions.forEach(fn => fn());
             this.cleanupFunctions = [];
             if (this.throttleInterval) {
@@ -602,6 +982,9 @@ export function sniptoComponent() {
             }
 
             this.userInput = '';
+            // The Alpine property is only one copy of the plaintext. The editor
+            // widget keeps its own buffer (and undo history), so clear that too.
+            this.clearEditor();
             this.protectionPassword = '';
             this.sniptoIdInput = '';
 

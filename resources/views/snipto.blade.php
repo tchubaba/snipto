@@ -53,6 +53,9 @@
                 'Passphrase must be at least 20 characters.' => __('Passphrase must be at least 20 characters.'),
                 'Your browser does not support this feature. Please update your browser.' => __('Your browser does not support this feature. Please update your browser.'),
                 'You have been temporarily locked out. Please check back later.' => __('You have been temporarily locked out. Please check back later.'),
+                'Ln :line, Col :col' => __('Ln :line, Col :col'),
+                ':count characters' => __(':count characters'),
+                ':count lines' => __(':count lines'),
             ]);
         @endphp
     </script>
@@ -63,14 +66,17 @@
         [x-cloak] { display: none !important; }
     </style>
 
-    <div class="w-full max-w-4xl flex flex-col"
+    <div class="w-full max-w-6xl my-auto flex flex-col"
          x-data="sniptoComponent()"
          x-init="init()"
          data-slug="{{ request()->path() }}"
          x-on:before-unmount.window="destroy()"
          x-on:request-language-change.window="handleLanguageChangeRequest($event)"
     >
-    <div class="rounded-xl p-6 space-y-4
+    {{-- px-4 matches the header/footer inner wrappers, so the editor's left and
+         right edges line up exactly with the logo and the language selector. --}}
+    <div x-ref="card"
+         class="snipto-card rounded-xl px-4 py-6 space-y-4
             shadow-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
             transition-colors duration-300"
     >
@@ -213,15 +219,49 @@
             <div x-show="showForm" x-cloak
                  x-transition.opacity.duration.500ms
                  x-transition.scale.origin.top
-                 class="space-y-4 transform transition-all duration-300">
-                <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
+                 class="create-form space-y-4 transform transition-all duration-300">
+                <p class="hide-when-short text-lg font-medium text-gray-700 dark:text-gray-300">
                     {!! __('Got something to share?') !!}
                 </p>
-                <textarea x-model="userInput" rows="5" placeholder="{!! __('Type or paste your text here') !!}"
-                          x-ref="textarea"
-                          class="w-full border rounded p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none
-                         dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200
-                         placeholder-gray-400 dark:placeholder-gray-500"></textarea>
+                {{--
+                    Editor: a native <textarea> plus a line-number gutter and an
+                    active-line band, both drawn by us. No third-party editor
+                    library, so native mobile keyboards, IME and clipboard
+                    behaviour keep working.
+
+                    The active-line band sits behind the transparent textarea and
+                    is positioned from the same per-line heights the gutter uses,
+                    so it stays put across soft-wrapped lines and scrolling.
+
+                    Only the create form is affected; the decrypted-payload view
+                    is untouched and still renders in the sandboxed iframe.
+                --}}
+                <div class="space-y-1.5">
+                    <div class="editor-shell" x-ref="editorShell" :class="{'is-focused': editorFocused}">
+                        <div class="editor-gutter" x-ref="gutter" aria-hidden="true"></div>
+                        <div class="editor-input-wrap">
+                            <div class="editor-active-line" x-ref="activeLine" aria-hidden="true"></div>
+                            <textarea x-model="userInput"
+                                      x-ref="textarea"
+                                      spellcheck="false"
+                                      autocomplete="off"
+                                      autocapitalize="off"
+                                      autocorrect="off"
+                                      @focus="editorFocused = true"
+                                      @blur="editorFocused = false"
+                                      @keydown.tab.prevent="insertIndent()"
+                                      @keyup="updateEditorCaret()"
+                                      @click="updateEditorCaret()"
+                                      placeholder="{{ __('Type or paste your text here') }}"
+                                      class="editor-input"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="editor-meta">
+                        <span x-text="editorCaretLabel()"></span>
+                        <span x-text="editorCountLabel()"></span>
+                    </div>
+                </div>
 
                 <div class="flex flex-col items-center space-y-4 w-full max-w-2xl mx-auto">
                     <div class="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
@@ -371,7 +411,7 @@
                                        placeholder="{{ __('Recipient\'s Snipto ID') }}"
                                        class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
                                 
-                                <div class="text-xs text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 p-3 rounded border border-gray-200 dark:border-gray-800">
+                                <div class="hide-when-short text-xs text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 p-3 rounded border border-gray-200 dark:border-gray-800">
                                     {!! __('Important: Double-check the recipient’s Snipto ID. If you enter it incorrectly, they will not be able to decrypt or read your message.') !!}
                                 </div>
                             </div>
@@ -407,7 +447,7 @@
                     <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
                         {!! __('By using Snipto, you agree with the') !!} <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{!! __('Terms of Service') !!}</a>.
                     </p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    <p class="hide-when-short text-xs text-gray-500 dark:text-gray-400 text-center">
                         {{ __('Keep your data safe by following our') }} <a href="/safety" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('safety tips') }}</a>.
                     </p>
                 </div>

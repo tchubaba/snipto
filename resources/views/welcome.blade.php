@@ -30,18 +30,18 @@
 @endsection
 
 @section('content')
-    <div class="flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
+    <div class="my-auto flex flex-col items-center justify-center text-center space-y-8 max-w-2xl w-full relative">
         <!-- Hero Section -->
         <div class="space-y-4">
             <h1 class="sr-only">End-to-end encrypted pastebin for ephemeral text</h1>
             <div class="flex justify-center">
-                <picture>
-                    <!-- Dark theme image -->
-                    <source srcset="/images/dark_snipto_logo.png" media="(prefers-color-scheme: dark)">
-                    <!-- Light theme image (fallback) -->
-                    <img src="/images/light_snipto_logo.png" alt="Snipto"
-                         class="w-10/11 max-w-[1440px] h-auto block mx-auto">
-                </picture>
+                {{-- Paired logos, one shown per theme. See the same pattern in
+                     the header: a media-query <source> cannot follow a manual
+                     theme override. --}}
+                <img src="/images/light_snipto_logo.png" alt="Snipto"
+                     class="logo-light w-10/11 max-w-[1440px] h-auto mx-auto">
+                <img src="/images/dark_snipto_logo.png" alt="Snipto"
+                     class="logo-dark w-10/11 max-w-[1440px] h-auto mx-auto">
             </div>
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
                 {{ __('An end-to-end encrypted pastebin service.') }}<br>
