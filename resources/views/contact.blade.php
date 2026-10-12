@@ -2,7 +2,7 @@
 @extends('layouts.main')
 
 @section('content')
-    <div class="max-w-3xl mx-auto py-12 px-6 text-gray-900 dark:text-gray-100">
+    <div class="my-auto max-w-3xl mx-auto py-12 px-6 text-gray-900 dark:text-gray-100">
         <h1 class="text-4xl font-bold mb-8 text-center text-indigo-600 dark:text-indigo-400">{!! ucfirst(__('contact us')) !!}</h1>
 
         <div class="space-y-6 text-lg">

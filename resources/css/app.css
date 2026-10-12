@@ -1,5 +1,55 @@
 @import 'tailwindcss';
 
+/* Tailwind's dark: variant follows prefers-color-scheme by default, which means
+   the `dark` class on <html> drives nothing. Redefine it against the class so
+   one class is the single source of truth for the theme — that is what lets the
+   header toggle work without a reload, what makes the logo swap follow an
+   override, and what the sandboxed snippet iframe already reads (snipto.js
+   derives its text colour from that class). The head script in
+   layouts/main.blade.php sets the class from the saved choice, or from the
+   device when there is none, before this stylesheet paints. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* The header control's sun/moon icons follow the .dark class directly instead
+   of an x-show, so the correct icon is already painted before Alpine boots and
+   there is no flash of the wrong one. Alpine only carries the click. */
+.theme-icon-sun {
+    display: none;
+}
+
+.theme-icon-moon {
+    display: block;
+}
+
+.dark .theme-icon-sun {
+    display: block;
+}
+
+.dark .theme-icon-moon {
+    display: none;
+}
+
+/* Logo pair: both files are in the markup and the class decides which is
+   shown, so an override the user chose wins over the device setting. The
+   display rules are ordered light-first so the light logo is the default, and
+   the .dark pair outranks the plain pair on specificity. */
+.logo-light,
+.logo-dark {
+    display: block;
+}
+
+.logo-dark {
+    display: none;
+}
+
+.dark .logo-light {
+    display: none;
+}
+
+.dark .logo-dark {
+    display: block;
+}
+
 /* Base .fi class (no background; overridden by country rules) */
 .fi {
     background-image: none;
@@ -34,6 +84,223 @@
 .fi-de {
     background-image: url("../../node_modules/flag-icons/flags/4x3/de.svg");
     background-position: 0 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Snipto create-form editor
+ *
+ * The gutter (line numbers) and the textarea must agree on font metrics down
+ * to the pixel, otherwise the numbers drift away from the lines they label.
+ * Both therefore read their font from the same custom properties, and the JS
+ * mirror measures wrapped-line heights using those same values.
+ * ------------------------------------------------------------------------- */
+.editor-shell {
+    --editor-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --editor-font-size: 14px;
+    --editor-line-height: 22px;
+    --editor-pad-y: 12px;
+    --editor-pad-x: 14px;
+    /* Smallest usable editing area. Lives here rather than in the JS so the
+       short-window media query below can lower it together with the copy it
+       drops. snipto.js reads it back with getComputedStyle. */
+    --editor-min-height: 200px;
+
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+
+    /* This is only the pre-JS default. Once the form is up, snipto.js measures
+       what the card actually holds besides the editor and sets an inline height
+       that fills the rest of the viewport, so the controls below stay on screen
+       instead of pushing the page into a scrollbar. There is deliberately no
+       upper bound: the card is meant to fill the viewport at any height, and the
+       editor is the part that flexes. The floor matches the one that code uses. */
+    height: max(var(--editor-min-height), calc(100vh - 560px));
+    min-height: var(--editor-min-height);
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color 200ms, box-shadow 200ms;
+}
+
+.dark .editor-shell {
+    border-color: #374151;
+    background: #1f2937;
+}
+
+.editor-shell.is-focused {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.45);
+}
+
+/* Wraps the textarea so the active-line band has something to position
+   against. The band is drawn behind the textarea, which is transparent, and
+   its top and height come from the same per-line measurements the gutter is
+   built from, so it stays correct across soft-wrapped lines and scrolling. */
+.editor-input-wrap {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    /* Clips the active-line band once it scrolls past the top of the editor. */
+    overflow: hidden;
+}
+
+.editor-active-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 0;
+    background: rgba(99, 102, 241, 0.10);
+    pointer-events: none;
+}
+
+.dark .editor-active-line {
+    background: rgba(129, 140, 248, 0.16);
+}
+
+.editor-gutter {
+    flex: 0 0 auto;
+    min-width: 3.25rem;
+    padding: var(--editor-pad-y) 0.6rem var(--editor-pad-y) 0.75rem;
+    border-right: 1px solid #e5e7eb;
+    background: #f9fafb;
+    color: #9ca3af;
+    font-family: var(--editor-font);
+    font-size: var(--editor-font-size);
+    line-height: var(--editor-line-height);
+    text-align: right;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.dark .editor-gutter {
+    border-right-color: #374151;
+    background: #111827;
+    color: #6b7280;
+}
+
+/* One row per logical line; height is set inline by JS to match the wrapped
+   height of that line in the textarea. */
+.editor-gutter-row {
+    height: var(--editor-line-height);
+}
+
+.editor-gutter-row.is-active {
+    color: #4b5563;
+    font-weight: 600;
+}
+
+.dark .editor-gutter-row.is-active {
+    color: #d1d5db;
+}
+
+.editor-input {
+    flex: 1 1 auto;
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* Above the active-line band, which is positioned and would otherwise paint
+       over the text. The background stays transparent so the band shows through. */
+    position: relative;
+    z-index: 1;
+    padding: var(--editor-pad-y) var(--editor-pad-x);
+    border: 0;
+    outline: none;
+    resize: none;
+    background: transparent;
+    color: #111827;
+    font-family: var(--editor-font);
+    font-size: var(--editor-font-size);
+    line-height: var(--editor-line-height);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    tab-size: 4;
+}
+
+.dark .editor-input {
+    color: #f3f4f6;
+}
+
+.editor-input::placeholder {
+    color: #9ca3af;
+}
+
+.dark .editor-input::placeholder {
+    color: #6b7280;
+}
+
+/* Off-screen twin of the textarea used to measure how many visual lines each
+   logical line occupies once soft-wrapped. */
+.editor-mirror {
+    position: absolute;
+    top: 0;
+    left: -99999px;
+    visibility: hidden;
+    pointer-events: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--editor-font, ui-monospace, monospace);
+    font-size: var(--editor-font-size, 14px);
+    line-height: var(--editor-line-height, 22px);
+    tab-size: 4;
+}
+
+.editor-mirror-row {
+    min-height: 1em;
+}
+
+/* Status strip under the editor: line/column + character count. */
+.editor-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-variant-numeric: tabular-nums;
+}
+
+.dark .editor-meta {
+    color: #9ca3af;
+}
+
+/* -------------------------------------------------------------------------
+ * Short-window compaction
+ *
+ * The editor is the flexible part of the card: it takes whatever height is
+ * left after everything else, so the card fills the viewport and the whole
+ * form stays visible without the page scrolling. That only holds while
+ * "everything else" is small enough to leave the editor a usable height, and
+ * the Password and Snipto ID modes carry an expiry picker, an extra field and
+ * a warning box on top of the mode switcher — around 150px more than the
+ * default mode. So below this window height we drop the decorative copy,
+ * tighten the rhythm and let the editor shrink a little further, which keeps
+ * the form fully visible down to roughly half a 1440p screen.
+ *
+ * The min-width guard matters: a phone is short as well as narrow, and a
+ * 390x844 viewport would otherwise lose its heading and its safety link.
+ * Below the width where the controls stop stacking, nothing is hidden and the
+ * form scrolls the way it always has.
+ * ---------------------------------------------------------------------- */
+@media (max-height: 900px) and (min-width: 640px) {
+    .editor-shell {
+        --editor-min-height: 160px;
+    }
+
+    .snipto-card {
+        padding-block: 0.75rem;
+    }
+
+    .create-form > * + * {
+        margin-top: 0.5rem;
+    }
+
+    .hide-when-short {
+        display: none;
+    }
 }
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
