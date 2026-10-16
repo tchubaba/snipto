@@ -35,7 +35,10 @@ jobs:
           images: tchubaba/snipto
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=latest
+            # enable= pins `latest` to one entry. Without it metadata-action emits
+            # it twice, and the sign step below then signs the same digest twice —
+            # which Rekor rejects.
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
 
       - name: Build and Push
         id: build-and-push
@@ -48,14 +51,27 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Buildx's signed provenance attestation already records this digest in
+          # Rekor, so the cosign sign below collides with it:
+          #   [409] createLogEntryConflict "an equivalent entry already exists"
+          # Cosign is the signer this repo documents (DOCKERHUB.md), so the
+          # attestation is what goes.
+          provenance: false
 
       - name: Sign the published Docker image
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
-        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+        # sort -u is belt-and-braces for the duplicate-tag case above. The step is
+        # deliberately fatal: an unsigned image should fail the run, not hide
+        # behind continue-on-error.
+        run: echo "${TAGS}" | sort -u | xargs -I {} cosign sign --yes {}@${DIGEST}
 
       - name: Update Docker Hub description
+        # Runs even if signing failed. The image is already pushed by this point,
+        # so a transparency-log hiccup must not leave the Hub page describing the
+        # previous release.
+        if: ${{ !cancelled() }}
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
