@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7a60827c0da64e65b931f81ab3734098",
+    "content-hash": "0d545a5c03151e18b3f75e9955d79667",
     "packages": [
         {
             "name": "brick/math",
@@ -5977,27 +5977,27 @@
         },
         {
             "name": "tchubaba/tiered-throttle",
-            "version": "v1.0.1",
+            "version": "v2.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/tchubaba/tiered-throttle.git",
-                "reference": "8f4a2d7729cfa11b9edbbe377b09b29cf9ccae4a"
+                "reference": "d6a2e0ee7d4ff31cf3a70c29be83f9fd88ec09a4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/tchubaba/tiered-throttle/zipball/8f4a2d7729cfa11b9edbbe377b09b29cf9ccae4a",
-                "reference": "8f4a2d7729cfa11b9edbbe377b09b29cf9ccae4a",
+                "url": "https://api.github.com/repos/tchubaba/tiered-throttle/zipball/d6a2e0ee7d4ff31cf3a70c29be83f9fd88ec09a4",
+                "reference": "d6a2e0ee7d4ff31cf3a70c29be83f9fd88ec09a4",
                 "shasum": ""
             },
             "require": {
-                "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
-                "illuminate/console": "^10.0|^11.0|^12.0|^13.0",
-                "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
-                "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+                "illuminate/cache": "^12.0|^13.0",
+                "illuminate/console": "^12.0|^13.0",
+                "illuminate/http": "^12.0|^13.0",
+                "illuminate/support": "^12.0|^13.0",
                 "php": "^8.2"
             },
             "require-dev": {
-                "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0"
+                "orchestra/testbench": "^10.0|^11.0"
             },
             "type": "library",
             "extra": {
@@ -6024,9 +6024,9 @@
             "description": "A progressive, tier-based rate limiter for Laravel.",
             "support": {
                 "issues": "https://github.com/tchubaba/tiered-throttle/issues",
-                "source": "https://github.com/tchubaba/tiered-throttle/tree/v1.0.1"
+                "source": "https://github.com/tchubaba/tiered-throttle/tree/v2.0.0"
             },
-            "time": "2026-05-26T02:56:13+00:00"
+            "time": "2026-10-12T16:55:45+00:00"
         },
         {
             "name": "tijsverkoyen/css-to-inline-styles",
@@ -11793,16 +11793,16 @@
         },
         {
             "name": "symfony/expression-language",
-            "version": "v8.1.6",
+            "version": "v8.1.9",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/expression-language.git",
-                "reference": "bda5b15a7658d256bcfe67d23eb0e10d437dc708"
+                "reference": "9c2729bca940d84938dc0b435d037e4844f237c9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/expression-language/zipball/bda5b15a7658d256bcfe67d23eb0e10d437dc708",
-                "reference": "bda5b15a7658d256bcfe67d23eb0e10d437dc708",
+                "url": "https://api.github.com/repos/symfony/expression-language/zipball/9c2729bca940d84938dc0b435d037e4844f237c9",
+                "reference": "9c2729bca940d84938dc0b435d037e4844f237c9",
                 "shasum": ""
             },
             "require": {
@@ -11836,7 +11836,7 @@
             "description": "Provides an engine that can compile and evaluate expressions",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/expression-language/tree/v8.1.6"
+                "source": "https://github.com/symfony/expression-language/tree/v8.1.9"
             },
             "funding": [
                 {
@@ -11856,7 +11856,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-08-30T01:03:44+00:00"
+            "time": "2026-10-09T13:58:01+00:00"
         },
         {
             "name": "symfony/filesystem",

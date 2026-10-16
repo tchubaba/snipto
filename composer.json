@@ -20,7 +20,7 @@
         "symfony/http-foundation": "~8.1.6",
         "symfony/polyfill-intl-idn": "~1.43.0",
         "symfony/routing": "~8.1.5",
-        "tchubaba/tiered-throttle": "^1.0"
+        "tchubaba/tiered-throttle": "^2.0"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",

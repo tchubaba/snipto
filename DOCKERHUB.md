@@ -51,6 +51,7 @@ Open http://localhost:8080 and start sharing. Set `APP_KEY` once and reuse the s
 | `DB_CONNECTION` | `mysql` | `mysql`, `mariadb`, `pgsql`, `sqlite` |
 | `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | — | Required for non-SQLite |
 | `SESSION_SECURE_COOKIE` | `true` | Set `false` only when testing over plain HTTP |
+| `TRUSTED_PROXIES` | *(unset)* | Set **only** when a reverse proxy fronts the container — see [Behind a reverse proxy](#behind-a-reverse-proxy) |
 
 The container runs migrations on boot and waits for the database to be reachable.
 
@@ -76,6 +77,43 @@ For SQLite, mount a volume at the path you point `DB_DATABASE` to (as in the qui
 ### Behind a reverse proxy
 
 Terminate TLS at your proxy (Caddy, Traefik, nginx) and forward to port `8080`. Set `APP_URL` to your public HTTPS URL and keep `SESSION_SECURE_COOKIE=true`.
+
+Then tell Snipto to believe that proxy for the client address:
+
+```bash
+  -e TRUSTED_PROXIES=172.18.0.2   # the proxy's address as the app container sees it
+```
+
+Caddy and Traefik send `X-Forwarded-For` on their own. nginx needs it spelled out:
+
+```nginx
+location / {
+    proxy_pass http://snipto:8080;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+`TRUSTED_PROXIES` takes a single IP, a CIDR, or a comma-separated list. Use the address the **app container sees as the connection peer** — on a shared Docker network that is the proxy's container address, not its public one. Giving the proxy a static `ipv4_address` and trusting exactly that is the tight option; trusting the network's whole CIDR is easier but means any container on that network can assert a client address.
+
+**Never set it to `*`.** That trusts the connection peer whatever it is — including the browser — so a visitor can send any `X-Forwarded-For` they like and get a fresh rate-limit key with every request. The tiered limiter would then be keyed on a value the attacker chose.
+
+### Exposed directly, with no proxy
+
+If you publish `8080` yourself, **leave `TRUSTED_PROXIES` unset.** The client's TCP connection terminates at the container, so `REMOTE_ADDR` is already the real client address and the rate limiter keys on it correctly; a forged `X-Forwarded-For` is simply ignored. Setting the variable in this topology is what would make header spoofing possible.
+
+Three things to know before running this way:
+
+- **No TLS.** The container runs PHP's built-in server, which cannot terminate TLS. Snippet content is encrypted in the browser before it leaves it, but that guarantee depends on the browser running untampered JavaScript — over plain HTTP an on-path attacker can rewrite the page and capture a passphrase or password *before* encryption happens. Plain HTTP is for LAN use and testing; anything routable should sit behind a TLS-terminating proxy.
+- **One request at a time.** `PHP_CLI_SERVER_WORKERS` is not set, so the built-in server serialises requests.
+- **8 MB request cap.** PHP's default `post_max_size` is `8M` while the API itself allows 10 MB, so uploads between 8 and 10 MB are rejected with `413`. A `PHP_POST_MAX_SIZE` environment variable does not fix it — `post_max_size` is a per-directory setting, so mount an ini file instead:
+
+  ```bash
+  # uploads.ini contains:  post_max_size=12M
+  docker run -d ... -v ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro ...
+  ```
+
+  Or front the container with a proxy that buffers the body.
 
 ---
 

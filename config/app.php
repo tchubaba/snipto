@@ -94,6 +94,44 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Trusted Proxies
+    |--------------------------------------------------------------------------
+    |
+    | Addresses of reverse proxies whose X-Forwarded-* headers Laravel may
+    | believe, so that $request->ip() reports the real client rather than the
+    | proxy. Applied in AppServiceProvider::boot(), which runs after the config
+    | files load — setting it from bootstrap/app.php would evaluate env() before
+    | .env has been read and silently do nothing.
+    |
+    | Leave this UNSET unless a proxy actually sits in front of the app:
+    |
+    |   - No proxy (the Docker Hub image exposed directly on :8080): the client's
+    |     TCP connection terminates at the container, so REMOTE_ADDR is already
+    |     the real client address. Nothing to configure, and setting this would
+    |     let any matching peer assert whatever client IP it likes — which for a
+    |     rate limiter means every request picks its own throttle key and no ban
+    |     ever sticks.
+    |
+    |   - The shipped production stack (make prod-up): also leave it unset. Nginx
+    |     resolves the real client address with the real_ip module before PHP-FPM
+    |     sees the request, so REMOTE_ADDR is already correct and the trust check
+    |     below would never match.
+    |
+    |   - Your own Caddy/Traefik/nginx in front of the :8080 image: set this to
+    |     that proxy's address as the app container sees it — a specific IP, a
+    |     CIDR, or a comma-separated list. Never '*': that trusts the client
+    |     itself. Trusting a whole Docker network CIDR works but means any
+    |     container on that network can forge the client address.
+    |
+    | Only X-Forwarded-For is honoured (see AppServiceProvider); host, proto and
+    | port headers stay untrusted.
+    |
+    */
+
+    'trusted_proxies' => env('TRUSTED_PROXIES'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Encryption Key
     |--------------------------------------------------------------------------
     |
