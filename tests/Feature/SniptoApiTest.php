@@ -387,6 +387,14 @@ class SniptoApiTest extends TestCase
     #[Test]
     public function it_uses_a_transaction_and_pessimistic_locking_for_atomic_read_and_delete()
     {
+        // FOR UPDATE is only emitted by the MySQL/MariaDB grammar; the SQLite
+        // fallback silently drops it, so the assertion is meaningless there.
+        // CI and the local docker stack both run MariaDB — this skips only for
+        // bare-SQLite setups.
+        if ( ! in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            $this->markTestSkipped('Pessimistic locking is only observable on MySQL/MariaDB.');
+        }
+
         Snipto::create([
             'slug'            => 'atomic-test',
             'payload'         => 'content',
