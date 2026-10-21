@@ -34,8 +34,9 @@ jobs:
       mariadb:
         image: mariadb:lts
         env:
+          MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: snipto
-          MARIADB_USERNAME: snipto
+          MARIADB_USER: snipto
           MARIADB_PASSWORD: secret
         ports:
           - 3306:3306
@@ -86,8 +87,9 @@ jobs:
       mariadb:
         image: mariadb:lts
         env:
+          MARIADB_ROOT_PASSWORD: root
           MARIADB_DATABASE: snipto
-          MARIADB_USERNAME: snipto
+          MARIADB_USER: snipto
           MARIADB_PASSWORD: secret
         ports:
           - 3306:3306
