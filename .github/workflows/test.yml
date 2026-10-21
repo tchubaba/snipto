@@ -30,13 +30,27 @@ jobs:
   phpunit:
     name: PHPUnit
     runs-on: ubuntu-24.04
+    services:
+      mariadb:
+        image: mariadb:lts
+        env:
+          MARIADB_DATABASE: snipto
+          MARIADB_USERNAME: snipto
+          MARIADB_PASSWORD: secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - uses: shivammathur/setup-php@4424c9aab975b57bd706ee5a39c6b4334d6e4f60 # 2.40.0
         with:
           php-version: ${{ env.PHP_VERSION }}
-          extensions: mbstring, bcmath, intl, gd, zip, intl, exif
+          extensions: pdo_mysql, mbstring, bcmath, intl, gd, zip, exif
           coverage: none
 
       - name: Cache Composer vendor
