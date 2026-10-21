@@ -40,6 +40,10 @@ fi
 # Ensure PHP parses environment variables (fixes missing env vars in php artisan serve)
 RUN echo 'variables_order = "EGPCS"' > /usr/local/etc/php/conf.d/docker-php-env.ini
 
+# Belt-and-braces alongside nginx's fastcgi_hide_header: no X-Powered-By header
+# (pentest Info: fingerprinting surface).
+RUN echo 'expose_php = Off' > /usr/local/etc/php/conf.d/expose-php.ini
+
 # Install Node.js (needed for building assets)
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \

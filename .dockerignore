@@ -17,6 +17,9 @@ storage/logs/*
 .phpunit.result.cache
 GEMINI.md
 CLAUDE.md
+AGENTS.md
+HERMES.md
+.pentest
 docker-compose.dev.yml
 docker-compose.prod.yml
 config.mk

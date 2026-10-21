@@ -27,11 +27,11 @@
     - If the slug does not exist, you can create a new snippet.
     - If it exists, Snipto identifies the protection mode. If password-protected, the user is prompted for the password before the payload is retrieved.
 3. **Snippet Sharing Modes:**
-    - **Random Secret (Default):** The snippet is encrypted in the browser with a randomly generated 256-bit key. The key is appended to the URL as `#k=`. The server never receives this key.
+    - **Random Secret (Default):** The browser generates a random secret and appends it to the URL as `#k=`. The AES-256 key is derived from that secret in the browser (Argon2id + HKDF). The server never receives the secret or the key.
     - **Password Protected:** The snippet is encrypted using a user-provided password. The recipient must enter the password to view the content. Customizable expiration times.
     - **Snipto ID (Asymmetric):** The sender encrypts to the recipient's published Snipto ID using X25519 ECDH. Only the recipient — who re-derives their private key from their passphrase in the browser — can decrypt. Private keys never leave the browser; the server only sees ciphertext, the sender's ephemeral public key, and a public per-recipient salt.
     - **E2EE Disabled (Plaintext):** Users can opt-out of encryption. In this mode, the snippet is sent to the server as-is. The UI provides a clear warning when this mode is active.
-4. **Automatic Expiration:** Snippets are single-use only — once they are successfully viewed, they are removed from the database. All snippets expire automatically 1 hour after creation (or up to 1 week if configured in password mode).
+4. **Automatic Expiration:** Snippets are single-use only — once they are successfully viewed, they are removed from the database. All snippets expire automatically 1 hour after creation (or up to 1 week for password-protected and Snipto ID snippets).
 5. **Secure Rendering:** Decrypted content is rendered inside a sandboxed iframe using Trusted Types to prevent XSS.
 
 ---
@@ -43,7 +43,7 @@
 2. Enter your content in the text area.
 3. Select your protection method using the switcher:
     - **Random Secret:** E2EE using a link-based key (Default).
-    - **Password:** E2EE using a password you choose (min 8 characters).
+    - **Password:** E2EE using a password you choose (min 12 characters).
     - **Snipto ID:** Paste the recipient's published Snipto ID. Only they can decrypt.
     - **E2EE Disabled:** No encryption (Not recommended for sensitive data).
 4. Click **Snipto it**.
@@ -68,7 +68,7 @@
 
 ## Technical Security Overview
 
-Snipto is designed with end-to-end encryption (E2EE) as a core principle. All encryption and decryption operations occur client-side in the browser using the Web Crypto API.
+Snipto is designed with end-to-end encryption (E2EE) as a core principle. All encryption and decryption operations occur client-side in the browser, using the Web Crypto API (AES-GCM, HKDF) plus libsodium via WebAssembly for the memory-hard and asymmetric parts (Argon2id, X25519).
 
 ### Encryption Algorithm
 Symmetric snippets are encrypted using **AES-256-GCM** with a 12-byte random nonce. Snipto ID snippets layer **X25519 ECDH** key agreement on top, with HKDF-SHA256 splitting the shared secret into separate AES-GCM and HMAC keys.
@@ -76,7 +76,7 @@ Symmetric snippets are encrypted using **AES-256-GCM** with a 12-byte random non
 ### Key Derivation
 Key derivation depends on the protection mode:
 
-- **Random Secret (URL fragment):** **Argon2id** (OWASP strong tier: memory 64 MB, opsLimit 3, parallelism 1) → HKDF-SHA256 → separate AES-GCM and HMAC keys. `key_hash` = HKDF-derived from Argon2id master (memory-hard). Because `key_hash` depends on the nonce, retrieval uses a two-step approach: first `GET /api/snipto/{slug}` returns the nonce, then the client derives `key_hash` via Argon2id+HKDF and makes a second request with it.
+- **Random Secret (URL fragment):** **Argon2id** (OWASP strong tier: memory 64 MB, opsLimit 3, parallelism 1) → HKDF-SHA256 → separate AES-GCM and HMAC keys. `key_hash` = HKDF-derived from Argon2id master (memory-hard). Because `key_hash` depends on the nonce, retrieval uses a two-step approach: first `GET /api/snipto/{slug}` returns only metadata — the nonce and a one-time `reveal_token` — and never the payload; the client then derives `key_hash` via Argon2id+HKDF and fetches the payload via `POST /api/snipto/{slug}/reveal`, sending `reveal_token` and `key_hash` in the POST body — never in a URL query string, where production access logs would capture them.
 - **Password Protected:** **Argon2id** at the OWASP strong tier (memory 64 MB, opsLimit 3, parallelism 1, output 32 bytes), via libsodium WebAssembly. Per-snippet salt is derived deterministically from a domain-separated SHA-256 over the nonce; the resulting master key is split via HKDF-SHA256 into AES-GCM and HMAC keys.
 - **Snipto ID:** **Argon2id** with the same parameters, but the salt is a **fresh 16-byte random value generated once per Snipto ID** and published as the first 16 bytes of the ID itself (Snipto ID = `base64(salt(16) || pubkey(32))` → 64 chars). The Argon2id output becomes the X25519 private key; the public key is the second half of the published Snipto ID. Senders ship the salt back to the server in the `recipient_salt` column, so the recipient can re-derive the key pair from the passphrase alone — no need to paste their Snipto ID to read incoming messages. The salt being public is by design: it defeats rainbow-table precomputation (every Snipto ID has its own keyspace) without leaking anything an attacker doesn't already see in the published ID.
 
@@ -87,7 +87,7 @@ Both the Snipto ID page and the Password-protected mode offer a **Generate for m
 
 ### Payload Handling
 - **Server Storage:** The server stores the base64-encoded encrypted payload (ciphertext + auth tag + HMAC), the nonce, the protection type, and a SHA-256 `key_hash`. For Snipto ID, it also stores the sender's ephemeral X25519 public key (`sender_public_key`) and the recipient's per-Snipto-ID salt (`recipient_salt`). The `key_hash` for Snipto ID is SHA-256 of the raw ECDH shared secret.
-- **Access Control:** The `key_hash` is required to retrieve the encrypted payload from the API, compared with `hash_equals()` for timing-safe comparison. This prevents unauthorized access even if the slug is guessed.
+- **Access Control:** The payload is released only by `POST /api/snipto/{slug}/reveal`. Each metadata `GET` issues a single-use `reveal_token`; the token is burned on any reveal attempt (right or wrong), so a failed attempt requires a fresh `GET` before retrying. The `key_hash` is verified with `hash_equals()` (timing-safe) **before** the payload is returned or the view counter is decremented — a wrong secret never consumes the snippet. This prevents unauthorized access even if the slug is guessed.
 - **Integrity:** AES-GCM and an additional HMAC-SHA256 ensure that any tampering with the ciphertext or nonce is detected during decryption. HMAC verification runs **before** decryption is attempted.
 
 ### CSP & Frontend Security
@@ -193,6 +193,29 @@ A `Makefile` is provided to simplify common tasks:
 | `make fix` | Automatically fix code style issues using Laravel Pint. |
 | `make logs` | Tail the application logs. |
 | `make fresh` | Reset the database and run migrations with seeders. |
+
+### Browser E2E Tests (Playwright)
+
+A Playwright suite walks the full create → retrieve lifecycle in a real browser for all four protection modes — Plaintext, URL Secret (`#k=` fragment), Password, and Snipto ID (including ID generation on `/sniptoid`) — and pins protocol behaviors such as single-use consumption, wrong-secret retry (the server 403s before burning the snippet), and the guarantee that `key_hash`/`reveal_token` never appear in any request URL.
+
+Run it locally against the dev stack:
+
+```bash
+make up                        # dev stack on http://localhost:8008
+npm install                    # once — installs @playwright/test
+npx playwright install chromium  # once — downloads the browser
+npm run test:e2e               # run the suite
+```
+
+Handy variants:
+
+```bash
+npx playwright test tests/e2e/sniptoid.spec.js   # a single spec
+npx playwright test --headed                     # watch the browser drive the UI
+npx playwright show-report                       # HTML report from the last run
+```
+
+The same suite runs in CI (`.github/workflows/test.yml`) on every push and pull request, alongside the PHPUnit suite. Specs live in `tests/e2e/`; configuration is in `playwright.config.js`.
 
 ---
 

@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
+use Illuminate\Database\QueryException;
 
 class SniptoTest extends TestCase
 {
@@ -63,20 +64,20 @@ class SniptoTest extends TestCase
     }
 
     #[Test]
-    public function it_handles_unlimited_views()
+    public function it_rejects_null_views_remaining_at_the_storage_layer()
     {
-        $snipto = Snipto::create([
+        // Pentest AUTHZ-007: NULL views_remaining used to mean "unlimited views",
+        // a latent state the API never intends to create. The column is now NOT NULL
+        // with a default of 1, so the unlimited state cannot be represented.
+        $this->expectException(QueryException::class);
+
+        Snipto::create([
             'slug'            => 'test-slug',
             'payload'         => 'some data',
             'protection_type' => ProtectionType::Plaintext,
             'expires_at'      => Carbon::now()->addHour(),
             'views_remaining' => null,
         ]);
-
-        $remaining = $snipto->decrementViews();
-
-        $this->assertNull($remaining);
-        $this->assertDatabaseHas('sniptos', ['slug' => 'test-slug']);
     }
 
     #[Test]

@@ -25,3 +25,10 @@ Thumbs.db
 _ide_helper.php
 .php-cs-fixer.cache
 docker/crowdsec/crowdsec-openresty-bouncer.conf
+.pentest/
+.hermes/
+
+# Playwright E2E artifacts
+test-results/
+playwright-report/
+blob-report/

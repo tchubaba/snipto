@@ -91,7 +91,7 @@
             <div class="space-y-4">
                 <div class="space-y-1">
                     <div class="relative">
-                        <input :type="passphraseRevealed ? 'text' : 'password'" x-model="passphrase"
+                        <input data-testid="sniptoid-passphrase-input" :type="passphraseRevealed ? 'text' : 'password'" x-model="passphrase"
                                @input="onPassphraseInput()"
                                @keydown.enter="deriveSniptoid()"
                                placeholder="{{ __('Enter a passphrase (min :count characters)', ['count' => Passphrase::MIN_LENGTH]) }}"
@@ -113,7 +113,7 @@
                         </div>
                     </div>
                     <div class="flex justify-between items-center text-xs">
-                        <button type="button" @click="generatePassphrase()"
+                        <button data-testid="sniptoid-diceware-btn" type="button" @click="generatePassphrase()"
                                 class="text-indigo-500 hover:underline">
                             {{ __('Generate for me') }}
                         </button>
@@ -145,7 +145,7 @@
                     </div>
                 </div>
 
-                <button @click="deriveSniptoid()"
+                <button data-testid="sniptoid-generate-btn" @click="deriveSniptoid()"
                         :disabled="loading || passphrase.length < minPassphraseLength"
                         class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                     <span x-show="!loading">{!! __('Generate Snipto ID') !!}</span>
@@ -169,7 +169,7 @@
                     {!! __('Your Snipto ID') !!}
                 </p>
                 <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
-                    <input type="text" :value="sniptoId" readonly
+                    <input data-testid="sniptoid-id-input" type="text" :value="sniptoId" readonly
                            class="w-full border rounded-lg p-3 font-mono text-sm bg-gray-50 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100 text-center select-all">
                     <button @click="copySniptoId()"
                             class="bg-indigo-500 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-95 whitespace-nowrap">

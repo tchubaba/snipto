@@ -1,0 +1,4 @@
+Contact: mailto:contact@snipto.net
+Expires: 2027-10-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://snipto.net/.well-known/security.txt

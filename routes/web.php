@@ -27,6 +27,9 @@ Route::prefix('api/snipto')->group(function () {
     Route::get('{slug}', [ApiController::class, 'show'])
         ->where('slug', '[A-Za-z0-9_-]+')
         ->middleware('tiered.throttle:show-snipto');
+    Route::post('{slug}/reveal', [ApiController::class, 'reveal'])
+        ->where('slug', '[A-Za-z0-9_-]+')
+        ->middleware('tiered.throttle:reveal-snipto');
 });
 
 Route::post('/locale', function (Request $request) {

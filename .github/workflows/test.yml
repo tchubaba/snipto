@@ -1,0 +1,141 @@
+# CI test pipeline: PHPUnit (SQLite in-memory via phpunit.xml) + Playwright E2E
+# (four-mode walkthrough incl. Snipto ID generation) against a native PHP 8.5
+# app with a MariaDB service container for prod parity (lockForUpdate in the
+# reveal path is a no-op on SQLite).
+#
+# Not covered here (manual matrix): the nginx+CrowdSec prod stack, TLS, and
+# privacy browsers (Tor/Mullvad block crypto.subtle X25519 jwk export, which is
+# why libsodium is used — behavior there can't be asserted from Chromium).
+#
+# Actions are pinned by full commit SHA, matching docker-publish.yml.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: '8.5'
+
+jobs:
+  phpunit:
+    name: PHPUnit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: shivammathur/setup-php@4424c9aab975b57bd706ee5a39c6b4334d6e4f60 # 2.40.0
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, bcmath, intl, gd, zip, intl, exif
+          coverage: none
+
+      - name: Cache Composer vendor
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
+
+      - run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - run: php artisan test
+
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-24.04
+    needs: phpunit
+    services:
+      mariadb:
+        image: mariadb:lts
+        env:
+          MARIADB_DATABASE: snipto
+          MARIADB_USERNAME: snipto
+          MARIADB_PASSWORD: secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: shivammathur/setup-php@4424c9aab975b57bd706ee5a39c6b4334d6e4f60 # 2.40.0
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_mysql, mbstring, bcmath, intl, gd, zip, exif, pcntl
+          coverage: none
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Cache Composer vendor
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        with:
+          path: vendor
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
+
+      - run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare .env (APP_ENV=local keeps the throttle private-range bypass
+          active for 127.0.0.1; secure cookies off since CI serves plain HTTP)
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/^SESSION_SECURE_COOKIE=.*/SESSION_SECURE_COOKIE=false/' .env
+
+      - run: npm ci
+      - run: npm run build
+      - run: php artisan migrate --force
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: playwright-${{ runner.os }}-
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Start app
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8008 > /tmp/serve.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8008/ > /dev/null && exit 0
+            sleep 1
+          done
+            cat /tmp/serve.log
+            exit 1
+
+      - run: npx playwright test
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8008
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

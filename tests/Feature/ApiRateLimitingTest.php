@@ -14,7 +14,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Tiered rate limiting on the two snippet API endpoints.
+ * Tiered rate limiting on the three snippet API endpoints.
  *
  * These tests pin the rules production runs with, in config/tiered-throttle.php,
  * and drive each one through escalation to lockout. The numbers are duplicated
@@ -60,6 +60,17 @@ class ApiRateLimitingTest extends TestCase
         'offense_ttl'     => 7200,
     ];
 
+    /**
+     * POST /api/snipto/{slug}/reveal — 20/min, then 10/2min, then 5/5min, then 12h
+     * lockout. Mirrors show-snipto: each attempt burns its one-time token, so
+     * sustained probing already costs a metadata GET per attempt.
+     */
+    private const REVEAL_LIMITER = [
+        'tiers'           => [[20, 60], [10, 120], [5, 300]],
+        'lockout_seconds' => 43200,
+        'offense_ttl'     => 7200,
+    ];
+
     private const MISSING_SLUG = 'no-such-snipto';
 
     private int $created = 0;
@@ -90,6 +101,7 @@ class ApiRateLimitingTest extends TestCase
     {
         $this->assertSame(self::SHOW_LIMITER, config('tiered-throttle.limiters.show-snipto'));
         $this->assertSame(self::STORE_LIMITER, config('tiered-throttle.limiters.store-snipto'));
+        $this->assertSame(self::REVEAL_LIMITER, config('tiered-throttle.limiters.reveal-snipto'));
     }
 
     #[Test]
@@ -289,6 +301,33 @@ class ApiRateLimitingTest extends TestCase
     }
 
     // ---------------------------------------------------------------------
+    // POST /api/snipto/{slug}/reveal — reveal-snipto
+    // ---------------------------------------------------------------------
+
+    #[Test]
+    public function reveal_snipto_allows_twenty_reveals_a_minute_then_blocks_with_a_reset_hint(): void
+    {
+        $this->allowReveals(20);
+
+        $blocked = $this->revealBlocked();
+        $blocked->assertHeader('X-RateLimit-Reset');
+        $blocked->assertHeader('Retry-After');
+        $blocked->assertJson(['message' => 'Too Many Attempts.']);
+    }
+
+    #[Test]
+    public function exhausting_the_reveal_limiter_leaves_the_other_limiters_alone(): void
+    {
+        $this->allowReveals(20);
+        $this->revealBlocked();
+
+        // Revealing as fast as possible has touched neither the read nor the
+        // create budget.
+        $this->getJson('/api/snipto/'.self::MISSING_SLUG)->assertNotFound();
+        $this->createSnipto()->assertOk();
+    }
+
+    // ---------------------------------------------------------------------
     // Which address the limiter keys on
     // ---------------------------------------------------------------------
 
@@ -379,10 +418,33 @@ class ApiRateLimitingTest extends TestCase
         $this->created++;
 
         return $this->postJson('/api/snipto', [
-            'slug'            => 'rl-'.$this->created,
+            // 8+ characters: the plaintext slug floor (F-005) would reject short
+            // probe slugs with 422 and break the throttle assertions below.
+            'slug'            => 'rl-probe-'.$this->created,
             'payload'         => 'Hello World',
             'protection_type' => ProtectionType::Plaintext->value,
         ]);
+    }
+
+    /**
+     * Reveal a slug that does not exist, expecting the controller's 404 every time.
+     * The reveal endpoint 404s before any token check for unknown slugs, so the
+     * limiter is the only thing that can change the status code away from 404.
+     */
+    private function allowReveals(int $times): void
+    {
+        for ($i = 0; $i < $times; $i++) {
+            $this->postJson('/api/snipto/'.self::MISSING_SLUG.'/reveal', ['reveal_token' => 'ff'])
+                ->assertNotFound();
+        }
+    }
+
+    private function revealBlocked(): TestResponse
+    {
+        $response = $this->postJson('/api/snipto/'.self::MISSING_SLUG.'/reveal', ['reveal_token' => 'ff']);
+        $response->assertStatus(429);
+
+        return $response;
     }
 
     /**

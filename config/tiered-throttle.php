@@ -150,6 +150,23 @@ return [
             'offense_ttl'     => 7200, // 2 hours
         ],
 
+        /*
+         | reveal-snipto
+         | Applied to: POST /api/snipto/{slug}/reveal
+         | Mirrors show-snipto: every reveal attempt consumes its one-time token, so a
+         | brute-force pace requires a fresh metadata GET per attempt anyway — the same
+         | escalation profile as the probe endpoint is the right brake here.
+         */
+        'reveal-snipto' => [
+            'tiers' => [
+                [20, 60],   // Tier 0: 20 attempts per 1 minute  (baseline)
+                [10, 120],  // Tier 1: 10 attempts per 2 minutes (first offense)
+                [5,  300],  // Tier 2:  5 attempts per 5 minutes (second offense)
+            ],
+            'lockout_seconds' => 43200, // 12 hours
+            'offense_ttl'     => 7200, // 2 hours
+        ],
+
     ],
 
 ];

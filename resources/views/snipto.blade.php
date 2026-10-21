@@ -163,13 +163,13 @@
                         <span x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                     </div>
 
-                    <input type="password" x-model="protectionPassword"
+                    <input data-testid="unlock-password-input" type="password" x-model="protectionPassword"
                            @keydown.enter="unlockWithPassword()"
                            :disabled="isThrottled || isLockedOut"
                            placeholder="{{ __('Enter password') }}"
                            class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                     
-                    <button @click="unlockWithPassword()"
+                    <button data-testid="unlock-password-btn" @click="unlockWithPassword()"
                             :disabled="isThrottled || isLockedOut || !protectionPassword.trim()"
                             class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                         {!! __('Unlock') !!}
@@ -201,13 +201,13 @@
                         <span x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                     </div>
 
-                    <input type="password" x-model="sniptoIdPassphrase"
+                    <input data-testid="unlock-passphrase-input" type="password" x-model="sniptoIdPassphrase"
                            @keydown.enter="unlockWithSniptoId()"
                            :disabled="isThrottled || isLockedOut"
                            placeholder="{{ __('Enter your passphrase') }}"
                            class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
 
-                    <button @click="unlockWithSniptoId()"
+                    <button data-testid="unlock-passphrase-btn" @click="unlockWithSniptoId()"
                             :disabled="isThrottled || isLockedOut || !sniptoIdPassphrase.trim()"
                             class="w-full bg-indigo-500 text-white px-6 py-3 rounded-lg shadow hover:bg-indigo-600 transition transform duration-150 active:scale-[0.98] font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                         {!! __('Decrypt') !!}
@@ -241,7 +241,7 @@
                         <div class="editor-gutter" x-ref="gutter" aria-hidden="true"></div>
                         <div class="editor-input-wrap">
                             <div class="editor-active-line" x-ref="activeLine" aria-hidden="true"></div>
-                            <textarea x-model="userInput"
+                            <textarea data-testid="content-textarea" x-model="userInput"
                                       x-ref="textarea"
                                       spellcheck="false"
                                       autocomplete="off"
@@ -271,28 +271,28 @@
                         <!-- Mode Switcher -->
                         <div class="flex p-1 bg-gray-100 dark:bg-gray-900 rounded-xl w-full max-w-lg border border-gray-200 dark:border-gray-700">
                             <!-- Mode 1: Random URL Secret Key -->
-                            <button @click="protectionType = 1" 
+                            <button data-testid="mode-btn-1" @click="protectionType = 1" 
                                     :class="protectionType === 1 ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
                                     class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200">
                                 {{ __('Random URL Secret Key') }}
                             </button>
 
                             <!-- Mode 3: Snipto ID -->
-                            <button x-show="cryptoSupported" @click="protectionType = 3"
+                            <button data-testid="mode-btn-3" x-show="cryptoSupported" @click="protectionType = 3"
                                     :class="protectionType === 3 ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
                                     class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200">
                                 {{ __('Snipto ID') }}
                             </button>
 
                             <!-- Mode 2: Password -->
-                            <button @click="protectionType = 2" 
+                            <button data-testid="mode-btn-2" @click="protectionType = 2" 
                                     :class="protectionType === 2 ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
                                     class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200">
                                 {{ __('Password') }}
                             </button>
 
                             <!-- Mode 0: E2EE Disabled -->
-                            <button @click="protectionType = 0"
+                            <button data-testid="mode-btn-0" @click="protectionType = 0"
                                     :class="protectionType === 0 ? 'bg-white dark:bg-gray-700 shadow-sm text-orange-600 dark:text-orange-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
                                     class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200">
                                 {{ __('E2EE disabled') }}
@@ -346,7 +346,7 @@
                                 </div>
 
                                 <div class="relative">
-                                    <input :type="passwordRevealed ? 'text' : 'password'" x-model="protectionPassword"
+                                    <input data-testid="create-password-input" :type="passwordRevealed ? 'text' : 'password'" x-model="protectionPassword"
                                            @input="onPasswordInput()"
                                            x-ref="protectionPasswordField"
                                            placeholder="{{ __('Enter a password to protect this snippet (min 12 chars)') }}"
@@ -407,7 +407,7 @@
                                     </div>
                                 </div>
 
-                                <input type="text" x-model="sniptoIdInput"
+                                <input data-testid="create-sniptoid-input" type="text" x-model="sniptoIdInput"
                                        placeholder="{{ __('Recipient\'s Snipto ID') }}"
                                        class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
                                 
@@ -437,7 +437,7 @@
                         <span x-show="isThrottled" x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                         <span x-show="isLockedOut" x-text="t('You have been temporarily locked out. Please check back later.')"></span>
                     </div>
-                    <button @click="submitSnipto()"
+                    <button data-testid="create-submit" @click="submitSnipto()"
                             :disabled="isThrottled || isLockedOut"
                             class="bg-indigo-500 text-white px-6 py-2 rounded shadow hover:bg-indigo-600
                            hover:shadow-lg transition transform duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
@@ -460,7 +460,7 @@
                  class="space-y-4 transform transition-all duration-300">
                 <p class="text-xl font-medium text-green-600 dark:text-green-400">{!! __('Snipto created. Share this link with the recipient:') !!}</p>
                 <div class="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
-                    <input type="text" :value="fullUrl" readonly
+                    <input data-testid="success-url-input" type="text" :value="fullUrl" readonly
                            x-ref="fullUrlInput"
                            class="w-full border rounded p-2 focus:ring-2 focus:ring-indigo-400 focus:outline-none
                               dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100">

@@ -18,6 +18,12 @@ window.supportsLibsodium = supportsLibsodium;
 export function sniptoComponent() {
     return {
         slug: null,
+        // One-time reveal capability handed out by the metadata GET. The payload
+        // is only ever released by POST /api/snipto/{slug}/reveal with this token
+        // (and key_hash in the POST body for encrypted modes) — never via a URL
+        // query string. Consumed on any reveal attempt, success or failure.
+        revealToken: null,
+        revealTokenConsumed: false,
         key: null,
         hmacKey: null,
         nonce: null,
@@ -162,13 +168,26 @@ export function sniptoComponent() {
 
                 const data = await res.json();
                 this.protectionType = data.protection_type;
+                this.revealToken = data.reveal_token || null;
+                this.revealTokenConsumed = false;
 
                 // Handle Protection Modes
                 if (this.protectionType === 0) {
-                    // Mode 0: Plaintext
+                    // Mode 0: Plaintext — the metadata GET never carries the payload;
+                    // it is released only by POST reveal with the one-time token.
+                    const res = await this.postReveal({ reveal_token: this.revealToken });
+                    this.revealTokenConsumed = true;
+
+                    if (res.status === 429) {
+                        this.handleThrottling(res, true);
+                        return;
+                    }
+                    if (!res.ok) throw new Error();
+
+                    const revealed = await res.json();
                     this.showPayload = true;
                     this.isPayloadEncrypted = false;
-                    const plainBytes = new TextEncoder().encode(data.payload);
+                    const plainBytes = new TextEncoder().encode(revealed.payload);
                     this.$nextTick(() => this.renderPayload(plainBytes));
                 } else if (this.protectionType === 1) {
                     // Mode 1: URL Secret
@@ -219,6 +238,38 @@ export function sniptoComponent() {
             }
         },
 
+        // POST the reveal payload. Returns the raw Response so callers keep their
+        // existing 403/429 handling. key_hash lives in this body — never in a URL.
+        async postReveal(body) {
+            return fetch(`/api/snipto/${encodeURIComponent(this.slug)}/reveal`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': this.getCsrfToken(),
+                },
+                body: JSON.stringify(body),
+            });
+        },
+
+        // The reveal token is single-use and every metadata GET overwrites it, so
+        // a retry (wrong password, wrong passphrase) must re-probe for a fresh one
+        // before it can reveal. Returns false when the probe failed.
+        async ensureRevealToken() {
+            if (this.revealToken && !this.revealTokenConsumed) return true;
+
+            const res = await fetch(`/api/snipto/${this.slug}`, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!res.ok) return false;
+
+            const data = await res.json();
+            this.revealToken = data.reveal_token || null;
+            this.revealTokenConsumed = false;
+            return !!this.revealToken;
+        },
+
         async retrieveAndDecrypt(secretBytes, preDerived = null) {
             try {
                 // URL Secret (Mode 1): derive key_hash from Argon2id master via HKDF, which
@@ -232,6 +283,8 @@ export function sniptoComponent() {
                     });
                     if (!res.ok) throw new Error();
                     const data = await res.json();
+                    this.revealToken = data.reveal_token || this.revealToken;
+                    this.revealTokenConsumed = false;
                     const nonceHex = data.nonce;
                     const derived = await this.deriveKeys(secretBytes, nonceHex);
                     return this.retrieveAndDecrypt(null, {
@@ -243,10 +296,16 @@ export function sniptoComponent() {
                 }
 
                 const secretHash = preDerived.secretHash;
-                const res = await fetch(`/api/snipto/${this.slug}?key_hash=${secretHash}`, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
+
+                // A previous failed attempt consumed the token (the server burns it
+                // on any attempt, right or wrong), so re-probe for a fresh one.
+                if (!(await this.ensureRevealToken())) throw new Error();
+
+                const res = await this.postReveal({
+                    reveal_token: this.revealToken,
+                    key_hash: secretHash,
                 });
+                this.revealTokenConsumed = true;
 
                 if (res.status === 403) {
                     if (this.protectionType === 2) {
@@ -857,6 +916,8 @@ export function sniptoComponent() {
         clearSensitiveRetrieval() {
             this.key = null;
             this.hmacKey = null;
+            this.revealToken = null;
+            this.revealTokenConsumed = false;
             if (this.nonce) {
                 this.nonce.fill(0);
                 this.nonce = null;
@@ -1141,10 +1202,14 @@ export function sniptoComponent() {
                 const keyHash = await this.sha256Hex(sharedBytes);
                 sharedBytes.fill(0);
 
-                const res = await fetch(`/api/snipto/${this.slug}?key_hash=${keyHash}`, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
+                // key_hash goes in the POST body with a fresh one-time reveal token.
+                if (!(await this.ensureRevealToken())) throw new Error();
+
+                const res = await this.postReveal({
+                    reveal_token: this.revealToken,
+                    key_hash: keyHash,
                 });
+                this.revealTokenConsumed = true;
 
                 if (res.status === 403) {
                     this.showToastMessage(this.t('Decryption failed. Please check your passphrase and try again.'));

@@ -20,6 +20,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $key_provider_type
  * @property string|null $recipient_salt
  * @property int|null $views_remaining
+ * @property string|null $reveal_token_hash
+ * @property Carbon|null $reveal_token_expires_at
  * @property ProtectionType $protection_type
  * @property Carbon $expires_at
  * @property Carbon|null $created_at
@@ -52,21 +54,25 @@ class Snipto extends Model
         'key_provider_type',
         'recipient_salt',
         'views_remaining',
+        'reveal_token_hash',
+        'reveal_token_expires_at',
         'protection_type',
         'expires_at',
     ];
 
     protected $casts = [
-        'slug'              => 'string',
-        'payload'           => 'string',
-        'key_hash'          => 'string',
-        'nonce'             => 'string',
-        'sender_public_key' => 'string',
-        'key_provider_type' => 'string',
-        'recipient_salt'    => 'string',
-        'views_remaining'   => 'integer',
-        'protection_type'   => ProtectionType::class,
-        'expires_at'        => 'datetime',
+        'slug'                    => 'string',
+        'payload'                 => 'string',
+        'key_hash'                => 'string',
+        'nonce'                   => 'string',
+        'sender_public_key'       => 'string',
+        'key_provider_type'       => 'string',
+        'recipient_salt'          => 'string',
+        'views_remaining'         => 'integer',
+        'reveal_token_hash'       => 'string',
+        'reveal_token_expires_at' => 'datetime',
+        'protection_type'         => ProtectionType::class,
+        'expires_at'              => 'datetime',
     ];
 
     /**

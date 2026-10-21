@@ -57,7 +57,7 @@
                     </li>
                     <li>
                         <strong>{!! __('Password Protected:') !!}</strong>
-                        {!! __('The key is the password you provide. We only store a hash of your password for verification — the actual password <strong>never leaves your browser</strong>.') !!}
+                        {!! __('The key is derived from the password you provide. We only store a verification token computed in your browser from your password — the actual password <strong>never leaves your browser</strong>.') !!}
                     </li>
                     <li>
                         <strong>{!! __('Snipto ID (Asymmetric):') !!}</strong>
@@ -86,7 +86,7 @@
             <div id="lost-key" class="scroll-mt-13">
                 <h2 class="text-xl font-semibold mb-3 text-indigo-600 dark:text-indigo-400">{!! __('What if the decryption key is lost?') !!}</h2>
                 <p>
-                    {!! __('If you lose the key (the <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">#</code> part of the URL or the password you chose), the Snipto cannot be decrypted. Since we never store or know your keys or passwords, we cannot help you recover them. <strong>No key, no decryption.</strong>') !!}
+                    {!! __('If you lose the key (the <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">#</code> part of the URL, the password you chose, or the passphrase behind your Snipto ID), the Snipto cannot be decrypted. Since we never store or know your keys, passwords or passphrases, we cannot help you recover them. <strong>No key, no decryption.</strong>') !!}
                 </p>
             </div>
 
@@ -120,7 +120,7 @@
                     {!! __('All encryption and decryption happens <strong>directly in your browser</strong>. The JavaScript code that performs these operations (snipto.js) is fully readable for transparency.') !!}
                 </p>
                 <p class="mt-2">
-                    {!! __('You can also inspect any network requests in your browser while creating or reading Sniptos. You will see that only scrambled, unreadable ciphertext is ever sent to our servers — the plain text of your Snipto and your encryption key are never transmitted or exposed.') !!}
+                    {!! __('You can also inspect any network requests in your browser while creating or reading Sniptos. In the encrypted modes, you will see that only scrambled, unreadable ciphertext reaches our servers — the plain text of your Snipto and your encryption key are never transmitted or exposed. The opt-in E2EE-disabled mode is the one exception: there, the text is sent as-is, which is why the UI warns you whenever it is active.') !!}
                 </p>
                 <p class="mt-2">
                     {!! __('Snipto is an <strong>open-source project</strong>. All source code is available at') !!}
