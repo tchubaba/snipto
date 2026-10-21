@@ -117,17 +117,28 @@
             <div id="end-to-end" class="scroll-mt-13">
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('How can I be sure my Snipto is end-to-end encrypted?') !!}</h2>
                 <p class="mt-2">
-                    {!! __('All encryption and decryption happens <strong>directly in your browser</strong>. The JavaScript code that performs these operations (snipto.js) is fully readable for transparency.') !!}
+                    {!! __('Your text is encrypted by <strong>your own browser</strong> before it is sent. What reaches our servers, and what sits in our database, is a block of unreadable characters. We have nothing to read, nothing to sell, and nothing to hand over.') !!}
                 </p>
                 <p class="mt-2">
-                    {!! __('You can also inspect any network requests in your browser while creating or reading Sniptos. In the encrypted modes, you will see that only scrambled, unreadable ciphertext reaches our servers — the plain text of your Snipto and your encryption key are never transmitted or exposed. The opt-in E2EE-disabled mode is the one exception: there, the text is sent as-is, which is why the UI warns you whenever it is active.') !!}
+                    {!! __('If you lose your key, we cannot recover your Snipto for you. That is not a policy choice; it is what end-to-end encryption means in practice: we never have the ability to read your Snipto, so there is nothing we could recover. The same property that makes a lost key final is what keeps your content private from everyone, including us.') !!}
                 </p>
                 <p class="mt-2">
-                    {!! __('Snipto is an <strong>open-source project</strong>. All source code is available at') !!}
+                    {!! __('The code that encrypts inside your browser (<code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">snipto.js</code>) is delivered to you in clear, readable form, and the entire project is open source at') !!}
                     <a href="https://github.com/tchubaba/snipto" target="_blank" class="text-indigo-500 hover:underline">
                         https://github.com/tchubaba/snipto
                     </a>
-                    {!! __('for anyone to inspect and verify. For those who want full control, you can also <strong>clone the repository and self-host</strong> your own instance of Snipto, ensuring your data never touches our servers.') !!}
+                    {!! __('for anyone to inspect and verify. Independent security researchers can read exactly what your browser does before your data ever leaves your device.') !!}
+                </p>
+                <p class="mt-2">
+                    {!! __('The one exception is the opt-in E2EE-disabled mode, which sends text as-is. That is why the app warns you whenever it is on.') !!}
+                </p>
+                <h3 class="mt-6 text-lg font-semibold text-indigo-600 dark:text-indigo-400">{!! __('For the technically curious') !!}</h3>
+                <p class="mt-2">
+                    {!! __('Open your browser\'s developer tools (F12), go to the Network tab, and create a Snipto: you will see that only ciphertext is sent to our servers. Want full control? Our official Docker Hub image, purpose-built for self-hosters, is available at') !!}
+                    <a href="https://hub.docker.com/r/tchubaba/snipto" target="_blank" class="text-indigo-500 hover:underline">
+                        https://hub.docker.com/r/tchubaba/snipto
+                    </a>
+                    {!! __('ready to pull and run: your own instance, your own infrastructure, and your data never touches our servers.') !!}
                 </p>
             </div>
 
