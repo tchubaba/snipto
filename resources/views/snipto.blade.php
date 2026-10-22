@@ -56,6 +56,7 @@
                 'Ln :line, Col :col' => __('Ln :line, Col :col'),
                 ':count characters' => __(':count characters'),
                 ':count lines' => __(':count lines'),
+                'E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.' => __('E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.'),
             ]);
         @endphp
     </script>
@@ -104,13 +105,27 @@
 
             <!-- Lockout Notice -->
             <div x-show="isLockedOut" x-cloak x-transition.opacity
-                 class="text-sm text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full">
+                 class="text-base sm:text-lg text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full">
                 <span x-text="t('You have been temporarily locked out. Please check back later.')"></span>
+            </div>
+
+            <!-- Slug below the creation floor (F-005): the editor can never succeed,
+                 so it is not loaded at all and this replaces it. The suggestion
+                 button sits outside the warning box, directly below it. -->
+            <div x-show="slugTooShort" x-cloak x-transition.opacity
+                 class="text-base sm:text-lg text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full">
+                <span>{{ __('This link is too short. Snipto links must be at least 4 characters. Please go back and choose a longer link.') }}</span>
+            </div>
+            <div x-show="slugTooShort" x-cloak x-transition.opacity class="text-center">
+                <button type="button" data-testid="suggest-slug" @click="suggestSlug()"
+                        class="inline-block bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 transition font-bold text-lg">
+                    {{ __('Create one for me') }}
+                </button>
             </div>
 
             <!-- Throttle Countdown (top-level: metadata-fetch throttle, outside of form/prompt contexts) -->
             <div x-show="isThrottled && !showPasswordPrompt && !showSniptoIdPrompt && !showForm" x-cloak x-transition.opacity
-                 class="text-xs text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800 w-full">
+                 class="text-sm sm:text-base text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full">
                 <span x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
             </div>
 
@@ -159,7 +174,7 @@
                 <div class="space-y-4">
                     <!-- Throttling Warning -->
                     <div x-show="isThrottled" x-cloak x-transition.opacity
-                         class="text-xs text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800 w-full mb-4">
+                         class="text-sm sm:text-base text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full mb-4">
                         <span x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                     </div>
 
@@ -197,7 +212,7 @@
                 <div class="space-y-4">
                     <!-- Throttling Warning -->
                     <div x-show="isThrottled" x-cloak x-transition.opacity
-                         class="text-xs text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800 w-full mb-4">
+                         class="text-sm sm:text-base text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full mb-4">
                         <span x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                     </div>
 
@@ -293,8 +308,10 @@
 
                             <!-- Mode 0: E2EE Disabled -->
                             <button data-testid="mode-btn-0" @click="protectionType = 0"
+                                    :disabled="isThrottled || isLockedOut || plaintextSlugTooShort"
+                                    :title="plaintextSlugTooShort ? t('E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.') : ''"
                                     :class="protectionType === 0 ? 'bg-white dark:bg-gray-700 shadow-sm text-orange-600 dark:text-orange-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-                                    class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200">
+                                    class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                                 {{ __('E2EE disabled') }}
                             </button>
                         </div>
@@ -369,6 +386,7 @@
                                 </div>
                                 <div class="flex justify-between items-center text-xs mt-1">
                                     <button type="button" @click="generatePassword()"
+                                            data-testid="generate-password-btn"
                                             class="text-indigo-500 hover:underline">
                                         {{ __('Generate for me') }}
                                     </button>
@@ -433,7 +451,7 @@
                 <div class="flex flex-col items-center space-y-2">
                     <!-- Throttling Warning (creation form) -->
                     <div x-show="isThrottled || isLockedOut" x-cloak x-transition.opacity
-                         class="text-xs text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded border border-red-200 dark:border-red-800 w-full">
+                         class="text-sm sm:text-base text-center text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-4 rounded border border-red-200 dark:border-red-800 w-full">
                         <span x-show="isThrottled" x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                         <span x-show="isLockedOut" x-text="t('You have been temporarily locked out. Please check back later.')"></span>
                     </div>
@@ -520,7 +538,7 @@
             <div x-show="errorMessage" x-cloak
                  x-transition.opacity.duration.300ms
                  x-text="errorMessage"
-                 class="text-red-600 dark:text-red-400 mt-4 font-medium">
+                 class="text-base sm:text-lg text-red-600 dark:text-red-400 mt-4 font-medium">
             </div>
         </div>
         </div>

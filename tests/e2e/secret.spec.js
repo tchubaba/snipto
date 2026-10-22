@@ -1,19 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './helpers.js';
 import { uniqueSlug, uniqueSentinel, createSnipto, expectPayloadShows } from './helpers.js';
 
 // Mode 1 (URL Secret): key travels only in the URL fragment (#k=). The fragment
 // never reaches the server; retrieval is POST /reveal with reveal_token +
 // key_hash in the BODY. This spec pins the protocol at the network layer too:
 // no request URL may ever carry key_hash or reveal_token (F-002 regression).
-test('url-secret create -> fragment-only key -> retrieve', async ({ browser }) => {
+test('url-secret create -> fragment-only key -> retrieve', async ({ newContext }) => {
     const slug = uniqueSlug('sec');
     const sentinel = uniqueSentinel('SECRET');
 
-    const creator = await browser.newContext();
+    const creator = await newContext();
     const url = await createSnipto(await creator.newPage(), slug, { mode: 1, content: sentinel });
     expect(url).toContain('#k=');
 
-    const recipient = await browser.newContext();
+    const recipient = await newContext();
     const page = await recipient.newPage();
 
     const apiRequests = [];

@@ -225,7 +225,11 @@
             Alpine.data('localeDropdown', () => ({
                 open: false,
                 locales: @json(config('app.supported_locales')),
-                locale: "{{ session('locale', config('app.locale')) }}",
+                // The effective request locale (cookie/browser detection via
+                // the global SetLocale middleware), not a session value that
+                // nothing writes — this also keeps the toggle correct on the
+                // 404 page, where no session exists.
+                locale: @json(app()->getLocale()),
                 get current() {
                     return this.locales[this.locale] || Object.values(this.locales)[0];
                 },

@@ -32,6 +32,7 @@ export function sniptoComponent() {
         loading: true,
         showPayload: false,
         showForm: false,
+        slugTooShort: false,
         showSuccess: false,
         errorMessage: '',
         userInput: '',
@@ -102,6 +103,27 @@ export function sniptoComponent() {
             }
         },
 
+        // Plaintext ("E2EE disabled") mode requires slug >= 8 chars server-side
+        // (F-005: for unencrypted sniptos the slug IS the only secret). Encrypted
+        // modes accept >= 4. The mode switcher disables mode 0 when this is true.
+        get plaintextSlugTooShort() {
+            return (this.slug || '').length < 8;
+        },
+
+        // "Create one for me": the slug is below every creation floor, so offer a
+        // memorable 3-word diceware slug (hyphen-joined; ~31 bits on the English
+        // EFF short list, ~37-38 bits on the larger locale lists) and reload the
+        // page with it. Hyphens are legal in the slug route charset; the wordlist
+        // loader already uses rejection sampling.
+        async suggestSlug() {
+            if ( ! window.generateDicewareSlug) return;
+            let slug;
+            do {
+                slug = await window.generateDicewareSlug();
+            } while (slug.length < 8); // defensive; word-joined slugs always clear the floor
+            window.location.href = `/${slug}`;
+        },
+
         async init() {
             this.slug = this.$el.dataset.slug || '';
             if (this.calledInit) return;
@@ -154,6 +176,15 @@ export function sniptoComponent() {
                 });
 
                 if (res.status === 404) {
+                    // Slug hardening (F-005): creation requires >= 4 chars in every
+                    // protection mode. Below that floor the create form could only
+                    // ever 422, so don't load the editor at all — show an error.
+                    // Checked after the probe so legacy short-slug sniptos created
+                    // before the floor existed stay viewable.
+                    if (this.slug.length < 4) {
+                        this.slugTooShort = true;
+                        return;
+                    }
                     this.showForm = true;
                     this.protectionType = 1;
                     this.loadBlacklist();

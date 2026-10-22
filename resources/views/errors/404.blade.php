@@ -15,7 +15,7 @@
         <!-- Call to Action -->
         <div class="space-y-4">
             <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-300">
-                {!! __('Snipto URLs can only contain') !!} <span class="font-bold">{!! __('letters and numbers (A–Z, 0–9)') !!}</span>.
+                {!! __('Snipto URLs can only contain') !!} <span class="font-bold">{!! __('letters, numbers, hyphens and underscores (A–Z, 0–9, - and _)') !!}</span>.
             </p>
             <div>
                 <a href="/" class="inline-block bg-indigo-500 text-white px-6 py-3 rounded-lg hover:bg-indigo-600 transition font-bold text-lg">

@@ -5,25 +5,41 @@
 @section('footer-js')
     <script @cspNonce>
         const form = document.getElementById('sniptoForm');
+        const slugInput = document.getElementById('slugInput');
+        const toast = document.getElementById('toast');
+        const toastText = document.getElementById('toastText');
+
+        const invalidCharsMsg = @js(__('Please use only letters, numbers, hyphens, and underscores.'));
+        const tooShortMsg = @js(__('Snipto links must be at least 4 characters. Please choose a longer link.'));
+
+        // Must stay in lockstep with the slug route regex in routes/web.php
+        // ([A-Za-z0-9_-]+) and the min:4 creation floor in ApiController::store()
+        // (F-005). Below that floor no protection mode can be created, so the
+        // form refuses to navigate there.
+        const slugRegex = /^[A-Za-z0-9_-]+$/;
+
+        function showToast(message) {
+            toastText.textContent = message;
+            toast.classList.remove('hidden', 'opacity-0');
+            toast.classList.add('opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 3000);
+        }
 
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            const slugInput = document.getElementById('slugInput');
             const slug = slugInput.value.trim();
-            const toast = document.getElementById('toast');
-            const alphanumericRegex = /^[a-zA-Z0-9]+$/;
 
-            if (slug && alphanumericRegex.test(slug)) {
-                window.location.href = '/' + slug;
+            if ( ! slug || ! slugRegex.test(slug)) {
+                showToast(invalidCharsMsg);
+            } else if (slug.length < 4) {
+                showToast(tooShortMsg);
             } else {
-                toast.classList.remove('hidden', 'opacity-0');
-                toast.classList.add('opacity-100');
-
-                setTimeout(() => {
-                    toast.classList.remove('opacity-100');
-                    toast.classList.add('opacity-0');
-                    setTimeout(() => toast.classList.add('hidden'), 300);
-                }, 3000);
+                window.location.href = '/' + slug;
             }
         });
     </script>
@@ -65,7 +81,7 @@
 
             <!-- Toast Notification -->
             <div id="toast" class="hidden absolute left-0 right-0 mx-auto top-[calc(100%+0.5rem)] max-w-[calc(100%-6rem)] bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg transition-opacity duration-300 opacity-0 z-10">
-                <p class="text-sm font-medium">{{ __('Please use only alphanumeric characters (letters and numbers).') }}</p>
+                <p id="toastText" class="text-sm font-medium">{{ __('Please use only letters, numbers, hyphens, and underscores.') }}</p>
             </div>
 
             <!-- Terms of Service notice -->

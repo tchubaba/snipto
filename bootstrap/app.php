@@ -18,9 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // SetLocale is global, not web-group: group middleware only run when a
+        // route matches, so route-less responses (404s from slugs that fail the
+        // route regex) would otherwise render in the default locale.
+        $middleware->prepend(SetLocale::class);
         $middleware->web([
             EncryptCookies::class,
-            SetLocale::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
         ]);
