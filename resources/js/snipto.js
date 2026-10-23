@@ -15,6 +15,104 @@ async function supportsLibsodium() {
 }
 window.supportsLibsodium = supportsLibsodium;
 
+// ---------------------------------------------------------------------------
+// X25519 public key validation (Snipto ID mode; audit finding F-2).
+//
+// sodium.crypto_scalarmult is raw RFC 7748: it accepts ANY 32 bytes as a peer
+// public key. Curve25519 has cofactor 8, so a malicious counterparty — here
+// the server, which supplies sender_public_key to the recipient — can hand
+// over a small-order curve point or a quadratic-twist point instead of a real
+// public key. The resulting shared secret then leaks the recipient's
+// long-lived Snipto ID private key bit by bit (Lim-style invalid-curve
+// recovery), and the key_hash = SHA-256(shared) we POST lets the server
+// verify each key candidate offline. RFC 7748 §7 explicitly warns designers
+// not to assume contributory behaviour on cofactored curves.
+//
+// One check closes all three classes (small-order curve points, twist points,
+// and mixed torsion+subgroup points): the peer point must lie in the
+// prime-order subgroup, i.e. [order]P = identity. Implemented as an
+// unclamped BigInt port of the RFC 7748 §5 ladder with the group order as the
+// scalar; a zero output means "in the subgroup" (the ladder encodes the
+// identity as 0, and the only curve point with x = 0 is the order-2 point
+// u = 0 — unique here because B²−4 is a quadratic residue mod p — which is
+// rejected outright before the ladder runs).
+// ---------------------------------------------------------------------------
+const X25519_P = (1n << 255n) - 19n;
+const X25519_A24 = 121665n; // (486662 − 2) / 4
+const X25519_ORDER = (1n << 252n) + 27742317777372353535851937790883648493n;
+
+function modPow(base, exp, mod) {
+    let result = 1n;
+    base = ((base % mod) + mod) % mod;
+    while (exp > 0n) {
+        if (exp & 1n) result = result * base % mod;
+        base = base * base % mod;
+        exp >>= 1n;
+    }
+    return result;
+}
+
+// RFC 7748 §5 Montgomery ladder, BigInt port, WITHOUT the ECDH scalar
+// clamping — the scalar passed here is the group order, not a private key.
+// Returns x([k]P) as a field element; the identity comes back as 0 because
+// z_2^(p−2) of 0 is 0, exactly as the RFC procedure behaves.
+function x25519Ladder(scalar, u) {
+    const p = X25519_P;
+    const x1 = u;
+    let x2 = 1n, z2 = 0n, x3 = u, z3 = 1n, swap = 0n;
+
+    for (let t = 254; t >= 0; t--) {
+        const kt = (scalar >> BigInt(t)) & 1n;
+        swap ^= kt;
+        if (swap === 1n) {
+            let tmp = x2; x2 = x3; x3 = tmp;
+            tmp = z2; z2 = z3; z3 = tmp;
+        }
+        swap = kt;
+
+        const A  = (x2 + z2) % p;
+        const AA = A * A % p;
+        const B  = ((x2 - z2) % p + p) % p;
+        const BB = B * B % p;
+        const E  = ((AA - BB) % p + p) % p;
+        const C  = (x3 + z3) % p;
+        const D  = ((x3 - z3) % p + p) % p;
+        const DA = D * A % p;
+        const CB = C * B % p;
+        const sum  = (DA + CB) % p;
+        const diff = ((DA - CB) % p + p) % p;
+        x3 = sum * sum % p;
+        z3 = x1 * diff % p * diff % p;
+        x2 = AA * BB % p;
+        z2 = E * ((AA + X25519_A24 * E) % p) % p;
+    }
+
+    // Single cswap AFTER the loop (Bernstein's original structure; RFC 7748
+    // prints it dedented below the loop). The loop body swaps only at its top.
+    if (swap === 1n) {
+        let tmp = x2; x2 = x3; x3 = tmp;
+        tmp = z2; z2 = z3; z3 = tmp;
+    }
+
+    return x2 * modPow(z2, p - 2n, p) % p;
+}
+
+// True iff the 32 little-endian bytes decode (per RFC 7748 rules: mask the
+// sign bit, reduce non-canonical values mod p) to a point in the prime-order
+// subgroup. False means: reject these bytes as a public key.
+function x25519PeerKeyValid(pubBytes) {
+    if (pubBytes.length !== 32) return false;
+
+    let u = 0n;
+    for (let i = 31; i >= 0; i--) u = (u << 8n) | BigInt(pubBytes[i]);
+    u &= (1n << 255n) - 1n;           // RFC 7748: MUST mask the MSB
+    if (u >= X25519_P) u %= X25519_P; // RFC 7748: MUST accept non-canonical, reduced
+
+    if (u === 0n) return false; // order-2 point: shared secret is always zero
+
+    return x25519Ladder(X25519_ORDER, u) === 0n;
+}
+
 export function sniptoComponent() {
     return {
         slug: null,
@@ -67,6 +165,10 @@ export function sniptoComponent() {
         keyProviderType: null,
         recipientSalt: null,
         sniptoIdPrefix: '',
+        // First 8 chars of the recipient Snipto ID a mode-3 snipto was
+        // encrypted for; shown on the success screen for out-of-band
+        // verification (audit finding F-5).
+        sentToIdFingerprint: '',
         showSniptoIdPrompt: false,
         passwordRevealed: false,
         passwordGenerated: false,
@@ -246,6 +348,20 @@ export function sniptoComponent() {
                     } catch {
                         this.sniptoIdPrefix = '';
                     }
+                    // Audit finding F-2 (defense in depth): /sniptoid saves
+                    // generated IDs to localStorage. If the salt this snipto
+                    // carries does not match the salt baked into the ID saved
+                    // in this browser, the snipto was addressed to a different
+                    // ID (or the server tampered with recipient_salt — the
+                    // derived keypair would then fail key_hash anyway). Warn
+                    // rather than let the user burn a passphrase attempt.
+                    try {
+                        const saved = JSON.parse(localStorage.getItem('sniptoid.savedIds') || '[]');
+                        if (saved.length === 1 && this.recipientSalt
+                            && saved[0].id.slice(0, 16) !== this.recipientSalt.slice(0, 16)) {
+                            this.showToastMessage(this.t('Heads up: this Snipto was addressed to a different Snipto ID than the one saved in this browser. Make sure you were given the right one.'));
+                        }
+                    } catch { /* private mode / corrupt storage: skip the hint */ }
                     this.showSniptoIdPrompt = true;
                 }
             } catch {
@@ -988,6 +1104,7 @@ export function sniptoComponent() {
             let recipientSaltBase64 = null;
 
             // Encryption Logic based on Mode
+            this.sentToIdFingerprint = '';
             if (finalProtectionType === 1 || finalProtectionType === 2) {
                 // E2EE Mode (Secret or Password)
                 let secretSourceStr;
@@ -1034,6 +1151,22 @@ export function sniptoComponent() {
                 const idBytes = this.base64ToBytes(this.sniptoIdInput.trim());
                 const recipientSaltBytes = idBytes.slice(0, 16);
                 const recipientPubkeyBytes = idBytes.slice(16);
+
+                // Audit finding F-2: a typed/corrupted ID whose pubkey half is a
+                // small-order or twist point would produce a degenerate ECDH.
+                // Reject with a clear message instead of encrypting to garbage.
+                if (!x25519PeerKeyValid(recipientPubkeyBytes)) {
+                    this.showToastMessage(this.t('Invalid Snipto ID format.'));
+                    this.loading = false;
+                    return;
+                }
+
+                // Audit finding F-5: show the recipient-ID fingerprint (same
+                // 8-char format the /sniptoid page prints under your own ID)
+                // on the success screen, so the sender can verify out-of-band
+                // they encrypted to the ID the recipient actually published.
+                this.sentToIdFingerprint = this.sniptoIdInput.trim().substring(0, 8);
+
                 const recipientPubkeyBase64 = this.bytesToBase64(recipientPubkeyBytes); // 44 chars with '='
                 recipientSaltBase64 = this.bytesToBase64(recipientSaltBytes); // 24 chars with '=='
 
@@ -1171,7 +1304,28 @@ export function sniptoComponent() {
         async deriveKeysFromECDH(privateKeyBytes, theirPublicKeyBase64, myPublicKeyBase64) {
             await sodium.ready;
             const theirPubBytes = this.base64ToBytes(theirPublicKeyBase64);
+
+            // Audit finding F-2: reject peer keys outside the prime-order
+            // subgroup BEFORE paying the ECDH. On the recipient path
+            // (unlockWithSniptoId) theirPublicKeyBase64 is the SERVER-supplied
+            // sender_public_key — a small-order or twist point there is a
+            // Lim-style key-recovery attempt against the long-lived Snipto ID
+            // private key, made worse by the key_hash we POST (offline oracle
+            // over candidate keys). On the sender path this validates the ID
+            // the user typed. See the x25519PeerKeyValid header comment.
+            if (!x25519PeerKeyValid(theirPubBytes)) {
+                throw new Error('X25519 peer public key rejected: not in the prime-order subgroup');
+            }
+
             const sharedBytes = sodium.crypto_scalarmult(privateKeyBytes, theirPubBytes);
+
+            // RFC 7748 §6.1 all-zero shared-secret check — belt-and-braces
+            // after the subgroup check; never derive from a degenerate secret.
+            let acc = 0;
+            for (const b of sharedBytes) acc |= b;
+            if (acc === 0) {
+                throw new Error('X25519 produced an all-zero shared secret');
+            }
 
             // Use HKDF (not PBKDF2) — ECDH output already has full entropy
             const hkdfKey = await crypto.subtle.importKey(

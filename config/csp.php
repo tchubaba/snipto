@@ -44,6 +44,15 @@ return [
     'report_uri' => env('CSP_REPORT_URI', '/api/csp-report'),
 
     /*
+     * Modern (Report-To) reporting group name. Chrome 118+ ignores the
+     * legacy report-uri directive and requires `report-to <group>` in the
+     * CSP header plus a matching Reporting-Endpoints header; the latter is
+     * emitted by App\Http\Middleware\CspReportingEndpoints, which maps this
+     * group onto report_uri above. Set CSP_REPORT_TO='' to disable.
+     */
+    'report_to' => env('CSP_REPORT_TO', 'snipto'),
+
+    /*
      * Headers will only be added if this setting is set to true.
      */
     'enabled' => env('CSP_ENABLED', true),

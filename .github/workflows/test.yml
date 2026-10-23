@@ -130,6 +130,12 @@ jobs:
           sed -i 's/^SESSION_SECURE_COOKIE=.*/SESSION_SECURE_COOKIE=false/' .env
 
       - run: npm ci
+
+      - name: X25519 peer-key validation test (BigInt ladder vs RFC 7748
+          vectors + libsodium cross-check; guards audit finding F-2 code in
+          resources/js/snipto.js)
+        run: node tests/js/x25519-validation.test.mjs
+
       - run: npm run build
       - run: php artisan migrate --force
 

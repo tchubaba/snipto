@@ -28,8 +28,9 @@ services:
             # request carries XDEBUG_SESSION/XDEBUG_TRIGGER — no per-request
             # connect attempt to the IDE port. 'yes' stalls every request if
             # anything half-listens on 9003 (WSL2/Docker Desktop firewalls
-            # SYNs there, and artisan serve is single-worker: one stalled
-            # request queues every request behind it).
+            # SYNs there, and the serve worker pool is small — see
+            # PHP_CLI_SERVER_WORKERS in .env.example: once every worker is
+            # stalled, the remaining requests queue behind them).
             XDEBUG_CONFIG: 'client_host=host.docker.internal client_port=9003 start_with_request=trigger'
             PHP_IDE_CONFIG: 'serverName=Snipto'
         volumes:

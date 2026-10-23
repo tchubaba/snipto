@@ -17,7 +17,7 @@
                 'If you received this link from someone, the trailing #k=… part may have been stripped by the chat or email client. Ask the sender to share the full link again.' => __('If you received this link from someone, the trailing #k=… part may have been stripped by the chat or email client. Ask the sender to share the full link again.'),
                 'This Snipto is end-to-end encrypted with a key carried in the URL, but the key in your link doesn’t match the one this Snipto was created with. The link may have been altered or copied incompletely.' => __('This Snipto is end-to-end encrypted with a key carried in the URL, but the key in your link doesn’t match the one this Snipto was created with. The link may have been altered or copied incompletely.'),
                 'Ask the sender to share the full, untouched link again. Snipto links are single-use and cannot be edited.' => __('Ask the sender to share the full, untouched link again. Snipto links are single-use and cannot be edited.'),
-                'The Snipto was found and the key was accepted, but its contents failed integrity verification. The encrypted data may be corrupted or have been tampered with.' => __('The Snipto was found and the key was accepted, but its contents failed integrity verification. The encrypted data may be corrupted or have been tampered with.'),
+                'Decryption failed: the key or the encrypted data could not be verified.' => __('Decryption failed: the key or the encrypted data could not be verified.'),
                 'For your safety, we won’t display content that can’t be verified. Please contact the sender.' => __('For your safety, we won’t display content that can’t be verified. Please contact the sender.'),
                 'A network or server error prevented us from loading this Snipto.' => __('A network or server error prevented us from loading this Snipto.'),
                 'Please check your connection and try again in a moment.' => __('Please check your connection and try again in a moment.'),
@@ -57,6 +57,7 @@
                 ':count characters' => __(':count characters'),
                 ':count lines' => __(':count lines'),
                 'E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.' => __('E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.'),
+                'Heads up: this Snipto was addressed to a different Snipto ID than the one saved in this browser. Make sure you were given the right one.' => __('Heads up: this Snipto was addressed to a different Snipto ID than the one saved in this browser. Make sure you were given the right one.'),
             ]);
         @endphp
     </script>
@@ -310,7 +311,7 @@
                             <button data-testid="mode-btn-0" @click="protectionType = 0"
                                     :disabled="isThrottled || isLockedOut || plaintextSlugTooShort"
                                     :title="plaintextSlugTooShort ? t('E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.') : ''"
-                                    :class="protectionType === 0 ? 'bg-white dark:bg-gray-700 shadow-sm text-orange-600 dark:text-orange-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                                    :class="protectionType === 0 ? 'bg-white dark:bg-gray-700 shadow-sm text-orange-600 dark:text-orange-400' : ((isThrottled || isLockedOut || plaintextSlugTooShort) ? 'text-gray-500' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300')"
                                     class="flex-1 py-2 px-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                                 {{ __('E2EE disabled') }}
                             </button>
@@ -488,6 +489,15 @@
                         {!! __('Copy') !!}
                     </button>
                 </div>
+                <!-- Audit finding F-5: recipient-ID fingerprint (first 8 chars
+                     of the Snipto ID, same format the /sniptoid page shows) so
+                     the sender can verify out-of-band they encrypted to the
+                     right ID. -->
+                <p x-show="sentToIdFingerprint" x-cloak
+                   class="text-sm text-gray-500 dark:text-gray-400 text-center">
+                    {!! __('Encrypted for Snipto ID:') !!}
+                    <span class="font-mono font-bold text-indigo-500 dark:text-indigo-400" x-text="sentToIdFingerprint"></span>…
+                </p>
                 <div class="flex flex-col items-center pt-2 space-y-2">
                     <p class="text-sm text-gray-500 dark:text-gray-400">{!! __('Or scan this QR code') !!}</p>
                     <canvas x-ref="qrcode" class="rounded shadow-sm"></canvas>
@@ -520,7 +530,7 @@
                         {!! __('Ask the sender to share the full, untouched link again. Snipto links are single-use and cannot be edited.') !!}
                     </p>
                     <p x-show="decryptError === 'integrity'" class="text-lg text-gray-600 dark:text-gray-300">
-                        {!! __('The Snipto was found and the key was accepted, but its contents failed integrity verification. The encrypted data may be corrupted or have been tampered with.') !!}
+                        {!! __('Decryption failed: the key or the encrypted data could not be verified.') !!}
                     </p>
                     <p x-show="decryptError === 'integrity'" class="text-base text-gray-500 dark:text-gray-400">
                         {!! __('For your safety, we won’t display content that can’t be verified. Please contact the sender.') !!}

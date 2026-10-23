@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Middleware\CrossOriginIsolation;
+use App\Http\Middleware\CspReportingEndpoints;
 use App\Http\Middleware\SetLocale;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
@@ -30,7 +32,23 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append([
             AddCspHeaders::class,
             CrossOriginIsolation::class,
+            // Maps the CSP report-to group to the collector URL; runs after
+            // AddCspHeaders so the CSP header it complements is in place.
+            CspReportingEndpoints::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // Storage hygiene (audit finding F-3): expired rows — including
+        // plaintext payloads — are deleted instead of lingering until their
+        // next read. The shipped Docker images start `schedule:work` in
+        // their entrypoints, so this fires automatically in dev, prod
+        // compose, and the Docker Hub image. Bare-metal / custom stacks
+        // must tick the schedule themselves (`schedule:run` from a crontab
+        // or `schedule:work` under a supervisor), or run
+        // `artisan sniptos:purge` directly on their own cadence.
+        $schedule->command('sniptos:purge')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

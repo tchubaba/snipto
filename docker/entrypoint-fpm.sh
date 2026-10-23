@@ -64,6 +64,13 @@ until php artisan migrate --force; do
     sleep 2
 done
 
+# Run the Laravel scheduler (sniptos:purge, see bootstrap/app.php). The
+# images ship no cron daemon; schedule:work is the in-container supervisor
+# that fires the Schedule. sniptos:purge is idempotent, so running this in
+# more than one replica is harmless.
+echo "Starting scheduler..."
+php artisan schedule:work &
+
 # Start PHP-FPM
 echo "Starting PHP-FPM..."
 exec php-fpm

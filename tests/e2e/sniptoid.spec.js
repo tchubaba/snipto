@@ -85,3 +85,62 @@ test('snipto ID editor: empty and malformed IDs are rejected client-side', async
 
     await expect(page.getByTestId('success-url-input')).toBeHidden();
 });
+
+// Audit finding F-2 regression (reject path): a malicious/compromised server
+// can hand the recipient a small-order sender_public_key (u-coordinate 1 is
+// a point of order 4) to force a predictable shared secret — a Lim-style
+// key-recovery attempt against the long-lived Snipto ID key, amplified by the
+// key_hash we would POST as an offline oracle. The client must reject the key
+// BEFORE deriving or POSTing key_hash and show the generic decryption-failure
+// screen — identical to any other decrypt failure, so the attacker gains no
+// oracle from our error handling either.
+test('snipto ID: server-supplied small-order sender key is rejected before reveal', async ({ newContext }) => {
+    const slug = uniqueSlug('trap');
+
+    // Plant the trap snipto directly through the API — a real sender's
+    // browser would never produce this sender_public_key (0x01 || 0x00*31).
+    const plantCtx = await newContext();
+    const plant = await plantCtx.newPage();
+    await plant.goto('/');
+    const created = await plant.evaluate(async (body) => {
+        const res = await fetch('/api/snipto', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            },
+            body: JSON.stringify(body),
+        });
+        return { status: res.status, body: await res.json() };
+    }, {
+        slug,
+        protection_type: 3,
+        payload: 'aGVsbG8=',
+        key_hash: 'a'.repeat(64),
+        nonce: '0123456789abcdef01234567',
+        sender_public_key: btoa('\x01' + '\x00'.repeat(31)),
+        recipient_salt: btoa('\x00'.repeat(16)),
+        key_provider_type: 'passphrase',
+    });
+    expect(created.status).toBe(200);
+    expect(created.body.success).toBe(true);
+
+    // Recipient opens the link: the probe hands them the trap key. Unlocking
+    // must land on the generic integrity screen, and no reveal POST may ever
+    // fire (that POST carries the key_hash oracle the attack is after).
+    const ctx = await newContext();
+    const page = await ctx.newPage();
+    const revealPosts = [];
+    page.on('request', (req) => {
+        if (req.method() === 'POST' && req.url().includes('/reveal')) revealPosts.push(req.url());
+    });
+
+    await page.goto(`/${slug}`);
+    await page.getByTestId('unlock-passphrase-input').waitFor({ timeout: 10000 });
+    await page.getByTestId('unlock-passphrase-input').fill('e2e trap-test passphrase 2026');
+    await page.getByTestId('unlock-passphrase-btn').click();
+
+    await expect(page.getByText('Decryption failed: the key or the encrypted data could not be verified.'))
+        .toBeVisible({ timeout: 20000 });
+    expect(revealPosts).toEqual([]);
+});

@@ -91,6 +91,13 @@ done
 echo "Starting queue worker..."
 php artisan queue:listen --tries=1 &
 
+# Run the Laravel scheduler (sniptos:purge, see bootstrap/app.php). The
+# images ship no cron daemon; schedule:work is the in-container supervisor
+# that fires the Schedule. sniptos:purge is idempotent, so running this in
+# more than one replica is harmless.
+echo "Starting scheduler..."
+php artisan schedule:work &
+
 # Default APP_PORT to 8080 if not set
 PORT=${APP_PORT:-8080}
 

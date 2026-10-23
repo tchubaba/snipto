@@ -48,6 +48,18 @@ export function sniptoidComponent(minPassphraseLength = 20) {
                 idBytes.set(pubkeyBytes, 16);
                 this.sniptoId = this.bytesToBase64(idBytes);
 
+                // Remember generated IDs in this browser (newest first, max
+                // 10). The retrieval page compares a snipto's recipient_salt
+                // against these to warn when the salts disagree (audit
+                // finding F-2 UX). A Snipto ID is public information — safe
+                // to keep in localStorage; the passphrase never is.
+                try {
+                    const saved = JSON.parse(localStorage.getItem('sniptoid.savedIds') || '[]');
+                    const list = [{ id: this.sniptoId, at: Date.now() },
+                        ...saved.filter(e => e && e.id !== this.sniptoId)].slice(0, 10);
+                    localStorage.setItem('sniptoid.savedIds', JSON.stringify(list));
+                } catch { /* private mode: nothing to save */ }
+
                 this.passphrase = '';
                 this.passphraseGenerated = false;
                 this.passphraseRevealed = false;

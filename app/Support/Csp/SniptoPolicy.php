@@ -22,6 +22,11 @@ class SniptoPolicy extends Basic
         $policy
             ->add(Directive::DEFAULT, Keyword::NONE)
             ->add(Directive::CONNECT, [Keyword::SELF, config('app.url')])
+            // No framed content of any kind: snippet rendering happens in
+            // sandboxed srcdoc iframes, which are exempt from frame-src (no
+            // URL fetch occurs). 'none' therefore blocks only attacker-
+            // injected external frames (audit finding F-5).
+            ->add(Directive::FRAME, Keyword::NONE)
             ->add(Directive::FRAME_ANCESTORS, Keyword::NONE)
             ->add(Directive::MANIFEST, Keyword::SELF)
             ->add(Directive::REQUIRE_TRUSTED_TYPES_FOR, Keyword::SCRIPT)

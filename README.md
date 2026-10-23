@@ -96,15 +96,18 @@ Snipto employs a multi-layered defense-in-depth strategy to protect user data an
 - **Strict Content Security Policy (CSP):** Using `Spatie\Csp`, the application enforces a strict policy:
     - `default-src 'none'`: All resources are blocked by default.
     - `frame-ancestors 'none'`: Prevents clickjacking.
+    - `frame-src 'none'`: Blocks all framed content; payload rendering uses sandboxed `srcdoc` iframes, which are exempt from `frame-src`.
     - `connect-src 'self' <APP_URL>`: Restricts AJAX requests to the origin server.
     - `script-src 'wasm-unsafe-eval'`: The narrow WASM-only keyword required by libsodium's WebAssembly — it does **not** enable JavaScript `eval()`.
     - `require-trusted-types-for 'script'`: Mandates the use of Trusted Types to prevent DOM-based XSS.
+    - **CSP Reporting:** The policy declares `report-to snipto`; the `CspReportingEndpoints` middleware emits the matching `Reporting-Endpoints` header pointing at `/api/csp-report`, so violation reports are collected server-side.
     - **Alpine.js CSP:** Uses the CSP-compatible build of Alpine.js to avoid `unsafe-eval`.
 
 - **Cross-Origin Isolation:** Specialized middleware ensures the browser runs in a secure context:
     - `Cross-Origin-Opener-Policy: same-origin` (COOP)
     - `Cross-Origin-Embedder-Policy: require-corp` (COEP)
     - `Cross-Origin-Resource-Policy: same-origin` (CORP)
+    - **CORS disabled:** Laravel's framework CORS middleware is pinned to `paths => []` (`config/cors.php`) — the API is same-origin only and never emits `Access-Control-*` headers.
 
 - **Secure Content Rendering:** 
     - Decrypted snippets are rendered in a **sandboxed `<iframe>`** (`sandbox="allow-same-origin"`) without `allow-scripts`, isolating the content from the main document.
@@ -186,6 +189,8 @@ make prod-down        # Stop the production stack
 ```
 
 HTTPS requires a certificate (`cert.pem`) and key (`key.pem`): set `SSL_CERT_DIR=/path/to/certs` to point at them (they are mounted read-only at `/etc/nginx/ssl` inside the Nginx container). Run `make crowdsec-setup` once after the first deployment to register the CrowdSec agent and generate the OpenResty bouncer configuration, then copy `CROWDSEC_API_KEY` into your `.env`. `make prod-deploy` additionally regenerates the Cloudflare IP allowlist for Nginx before starting the stack. Utility targets accept `MODE=production` to run inside the production containers (e.g., `make artisan cmd="migrate" MODE=production`).
+
+The app container starts `php artisan schedule:work`, which runs `php artisan sniptos:purge` every 15 minutes to delete expired sniptos from the database (expiry is always enforced at read time regardless; the purge is storage hygiene, so payloads at rest don't outlive their nominal expiry by more than one scheduler interval). If you deploy outside the shipped images (bare metal or a custom stack), tick the schedule yourself — add `* * * * * php artisan schedule:run` to a crontab or run `schedule:work` under a supervisor — or schedule `sniptos:purge` directly.
 
 ### Makefile Shortcuts
 
