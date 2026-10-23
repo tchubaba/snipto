@@ -32,7 +32,7 @@ Snipto is designed with a **zero-knowledge, end-to-end encrypted** model by defa
 
 *   **Server Never Sees Keys:** For Secret, Password, and Snipto ID modes, the server never receives the user's passphrase, password, or private keys.
 *   **Encryption is Client-Side:** All cryptographic operations (Argon2id key derivation, AES-256-GCM encryption, X25519 ECDH) are performed in the user's browser using WebAssembly (libsodium) or the WebCrypto API.
-*   **Payloads are Ciphertext:** The server only stores encrypted payloads. Without the client-side key, the data is mathematically inaccessible.
+*   **Payloads are Ciphertext:** In the encrypted modes, the server only stores encrypted payloads. Without the client-side key, the data is mathematically inaccessible. (The Plaintext mode is an explicit user opt-out of E2EE and stores the snippet as-is; the UI warns clearly when it is active.)
 
 ### Cryptographic Standards
 
@@ -44,9 +44,9 @@ Snipto is designed with a **zero-knowledge, end-to-end encrypted** model by defa
 ### Content Security Policy (CSP)
 
 Snipto enforces a strict CSP to prevent XSS and other client-side attacks:
-*   **No `unsafe-inline` or `unsafe-eval`:** Inline scripts/styles are prohibited.
+*   **No `unsafe-inline` or `unsafe-eval`:** Inline scripts/styles are only allowed with a per-request cryptographic nonce (`script-src`/`style-src` each carry a fresh nonce; the application's own inline scripts use it).
 *   **Trusted Types:** All DOM content injection uses Trusted Types (`snipto-srcdoc` policy) with sandboxed iframes.
-*   **WASM Support:** `'wasm-unsafe-eval'` is the only exception in `script-src`, required for libsodium's WebAssembly.
+*   **WASM Support:** `script-src` contains only `'self'`, a per-request nonce, and `'wasm-unsafe-eval'` — the narrow WASM-only keyword required by libsodium's WebAssembly, which does not enable JavaScript `eval()`.
 
 ### Snipto ID Security
 
@@ -59,7 +59,7 @@ Snipto enforces a strict CSP to prevent XSS and other client-side attacks:
 *   **Client-Side Trust:** Users must trust the Snipto client-side code. We encourage auditing the source code and verifying the Docker Hub image build process.
 *   **Passphrase Strength:** Security is only as strong as the user's passphrase. We enforce minimum lengths (12 chars for Password mode, 20 chars for Snipto ID) and recommend strong, memorable passphrases.
 *   **Browser Extensions:** As a browser-based E2EE solution, Snipto can be vulnerable to malicious browser extensions that intercept data before encryption or after decryption. We mitigate this by educating users on best practices in our [Safety Guide](/safety), including recommending the use of a dedicated, clean browser profile for sensitive snippets.
-*   **URL Secret Mode Key Exposure:** In Random URL Secret mode, the encryption key is embedded in the URL fragment (`#key=...`), meaning anyone with the full URL can read the snippet. We mitigate this through the **ephemerality** of the snippet and a **1-hour expiration limit**. Furthermore, all Snipto modes are **automatically deleted from the server immediately upon retrieval**, limiting the window of opportunity for unauthorized access. For higher security, we recommend **Snipto ID mode**, which uses **asymmetric encryption** to eliminate the need to share a secret or password along with the URL.
+*   **URL Secret Mode Key Exposure:** In Random URL Secret mode, the encryption key is embedded in the URL fragment (`#k=...`), meaning anyone with the full URL can read the snippet. We mitigate this through the **ephemerality** of the snippet and a **1-hour expiration limit**. Furthermore, all Snipto modes are **automatically deleted from the server immediately upon retrieval**, limiting the window of opportunity for unauthorized access. For higher security, we recommend **Snipto ID mode**, which uses **asymmetric encryption** to eliminate the need to share a secret or password along with the URL.
 
 ## Contact
 

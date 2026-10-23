@@ -50,8 +50,8 @@
 
 ### Generating a Snipto ID
 1. Visit `https://snipto.net/sniptoid`.
-2. Enter a passphrase (minimum 20 characters) — or click **Generate for me** to roll a 6-word diceware passphrase from the EFF short wordlist (~62 bits of entropy).
-3. If you used the generator, **reveal or copy** the passphrase before continuing — once you derive the ID, the passphrase is wiped from memory.
+2. Enter a passphrase (minimum 20 characters) — or click **Generate for me** to roll a diceware passphrase: 6 words from the EFF short wordlist (~62 bits of entropy) in English, or 5 words from a 7,776-word frequency list (~64.6 bits) in other locales.
+3. If you used the generator, the passphrase is shown immediately — **copy or memorize it** before continuing: once you derive the ID, the passphrase is wiped from memory.
 4. Click **Generate Snipto ID**. Save both the passphrase **and** the resulting 64-character Snipto ID — both are required to decrypt incoming messages.
 5. Share your Snipto ID with anyone who wants to send you encrypted snippets.
 
@@ -83,7 +83,7 @@ Key derivation depends on the protection mode:
 The X25519 + Argon2id stack is feature-detected at runtime; browsers without support see an "update your browser" banner and the Snipto ID mode is hidden.
 
 ### Passphrase Generator
-Both the Snipto ID page and the Password-protected mode offer a **Generate for me** button that produces a 6-word diceware passphrase from the EFF short wordlist (1,296 words, CC-BY-3.0, ~62 bits). Generation uses `crypto.getRandomValues` with rejection sampling to avoid modulo bias. Generated passphrases are masked by default; the submit button stays disabled until the user reveals or copies the value, preventing accidental loss of an unmemorable secret.
+Both the Snipto ID page and the Password-protected mode offer a **Generate for me** button that produces a diceware passphrase. English uses the EFF short wordlist (1,296 words, CC-BY-3.0): 6 words ≈ 62 bits. The German, Spanish, French, and Brazilian-Portuguese locales use larger 7,776-word frequency lists: 5 words ≈ 64.6 bits, keeping entropy similar with fewer (longer) words. Generation uses `crypto.getRandomValues` with rejection sampling to avoid modulo bias. A generated passphrase is auto-revealed in the input so the user sees it before continuing; manually typed passphrases are masked behind a show/hide toggle. The passphrase is wiped from memory once the Snipto ID is derived.
 
 ### Payload Handling
 - **Server Storage:** The server stores the base64-encoded encrypted payload (ciphertext + auth tag + HMAC), the nonce, the protection type, and a SHA-256 `key_hash`. For Snipto ID, it also stores the sender's ephemeral X25519 public key (`sender_public_key`) and the recipient's per-Snipto-ID salt (`recipient_salt`). The `key_hash` for Snipto ID is SHA-256 of the raw ECDH shared secret.
@@ -96,7 +96,8 @@ Snipto employs a multi-layered defense-in-depth strategy to protect user data an
 - **Strict Content Security Policy (CSP):** Using `Spatie\Csp`, the application enforces a strict policy:
     - `default-src 'none'`: All resources are blocked by default.
     - `frame-ancestors 'none'`: Prevents clickjacking.
-    - `connect-src 'self'`: Restricts AJAX requests only to the origin server.
+    - `connect-src 'self' <APP_URL>`: Restricts AJAX requests to the origin server.
+    - `script-src 'wasm-unsafe-eval'`: The narrow WASM-only keyword required by libsodium's WebAssembly — it does **not** enable JavaScript `eval()`.
     - `require-trusted-types-for 'script'`: Mandates the use of Trusted Types to prevent DOM-based XSS.
     - **Alpine.js CSP:** Uses the CSP-compatible build of Alpine.js to avoid `unsafe-eval`.
 
@@ -144,7 +145,7 @@ For a security-focused application like Snipto, supply chain integrity is critic
      --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
      tchubaba/snipto:latest
    ```
-3. **Build from Source:** For the highest level of trust, clone this repository and build the Docker image yourself. The provided Dockerfiles use strict multi-stage builds, pin base images by digest, and use lockfile-based `npm ci` builds.
+3. **Build from Source:** For the highest level of trust, clone this repository and build the Docker image yourself. The provided Dockerfiles pin every base image by digest, bake PHP dependencies and built assets into the production image, and use lockfile-based `npm ci` builds.
 
 ---
 
@@ -174,6 +175,18 @@ By default, Snipto starts a MariaDB container. To use an external database inste
 
 The application will automatically wait for your external database to be accessible before running migrations.
 
+### Production Stack (Nginx + PHP-FPM + CrowdSec)
+
+For real deployments the repository ships a hardened production stack: PHP-FPM behind OpenResty Nginx with HTTPS on port 443, protected by a CrowdSec bouncer (the CrowdSec agent parses the Nginx access logs, detects attacks, and shares ban decisions with the bouncer).
+
+```bash
+make prod-build       # Build the FPM image and pull the Nginx/CrowdSec images
+make prod-up          # Start the production stack (Nginx :443 → FPM :9000)
+make prod-down        # Stop the production stack
+```
+
+HTTPS requires a certificate (`cert.pem`) and key (`key.pem`): set `SSL_CERT_DIR=/path/to/certs` to point at them (they are mounted read-only at `/etc/nginx/ssl` inside the Nginx container). Run `make crowdsec-setup` once after the first deployment to register the CrowdSec agent and generate the OpenResty bouncer configuration, then copy `CROWDSEC_API_KEY` into your `.env`. `make prod-deploy` additionally regenerates the Cloudflare IP allowlist for Nginx before starting the stack. Utility targets accept `MODE=production` to run inside the production containers (e.g., `make artisan cmd="migrate" MODE=production`).
+
 ### Makefile Shortcuts
 
 A `Makefile` is provided to simplify common tasks:
@@ -190,9 +203,14 @@ A `Makefile` is provided to simplify common tasks:
 | `make shell` | Open a bash shell inside the `app` container. |
 | `make test` | Run the PHPUnit test suite. |
 | `make grumphp` | Run GrumPHP quality checks. |
-| `make fix` | Automatically fix code style issues using Laravel Pint. |
+| `make fix` | Automatically fix PHP code style issues using php-cs-fixer. |
+| `make lint` | Check PHP code style without modifying files. |
 | `make logs` | Tail the application logs. |
 | `make fresh` | Reset the database and run migrations with seeders. |
+| `make prod-build` | Build the production images (PHP-FPM + Nginx). |
+| `make prod-up` / `make prod-down` | Start / stop the production stack. |
+| `make crowdsec-setup` | One-time CrowdSec agent registration for the production stack. |
+| `make prod-deploy` | Refresh the Cloudflare IP allowlist and start the production stack. |
 
 ### Browser E2E Tests (Playwright)
 
@@ -201,10 +219,16 @@ A Playwright suite walks the full create → retrieve lifecycle in a real browse
 Run it locally against the dev stack:
 
 ```bash
-make up                        # dev stack on http://localhost:8008
+make up                        # dev stack on http://localhost:8080
 npm install                    # once — installs @playwright/test
 npx playwright install chromium  # once — downloads the browser
 npm run test:e2e               # run the suite
+```
+
+The suite follows the `APP_PORT` in your local `.env` automatically (falling back to the 8080 default when there is no `.env`). To force a specific origin, set `E2E_BASE_URL`:
+
+```bash
+E2E_BASE_URL=http://localhost:9090 npm run test:e2e
 ```
 
 Handy variants:
@@ -215,7 +239,7 @@ npx playwright test --headed                     # watch the browser drive the U
 npx playwright show-report                       # HTML report from the last run
 ```
 
-The same suite runs in CI (`.github/workflows/test.yml`) on every push and pull request, alongside the PHPUnit suite. Specs live in `tests/e2e/`; configuration is in `playwright.config.js`.
+The same suite runs in CI (`.github/workflows/test.yml`) on every pull request and every push to `master`, alongside the PHPUnit suite. Specs live in `tests/e2e/`; configuration is in `playwright.config.js`.
 
 ---
 

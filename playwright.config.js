@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
 // E2E walkthrough of all four protection modes against a running Snipto instance.
-// Local: `make up` first, then `npm run test:e2e` (targets http://localhost:8008).
+// Local: `make up` first, then `npm run test:e2e`. The base URL follows the
+// APP_PORT in the local .env (the same value the dev stack binds to), falling
+// back to the .env.example default of 8080. E2E_BASE_URL overrides both.
 // CI: the app is booted by .github/workflows/test.yml before the test step.
 //
 // Why these settings:
@@ -12,7 +15,18 @@ import { defineConfig, devices } from '@playwright/test';
 // - chromium only — libsodium WASM + WebCrypto behavior is engine-consistent;
 //   Tor/Mullvad (the privacy browsers that motivated libsodium over WebCrypto
 //   X25519) are a manual matrix, not CI.
-const BASE_URL = process.env.E2E_BASE_URL || 'http://localhost:8008';
+function localAppPort() {
+    try {
+        const match = readFileSync(new URL('.env', import.meta.url), 'utf8')
+            .match(/^APP_PORT=(\d+)/m);
+        if (match) return match[1];
+    } catch {
+        // No local .env — fall through to the .env.example default.
+    }
+    return '8080';
+}
+
+const BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${localAppPort()}`;
 
 export default defineConfig({
     testDir: './tests/e2e',
