@@ -1,8 +1,8 @@
 import { test, expect } from './helpers.js';
 import { uniqueSlug, uniqueSentinel, uniquePassword, createSnipto, expectPayloadShows, expectToast } from './helpers.js';
 
-// Mode 2 (Password): wrong password -> server 403 on key_hash BEFORE
-// decrementViews (ApiController::reveal), so the snipto is NOT burned and the
+// Mode 2 (Password): wrong password -> server 403 on key_hash BEFORE any view
+// is consumed (ApiController::reveal), so the snipto is NOT burned and the
 // client re-probes for a fresh reveal token (ensureRevealToken) and retries.
 // This spec pins that whole retry path end-to-end.
 test('password create -> wrong password retryable -> retrieve', async ({ newContext }) => {

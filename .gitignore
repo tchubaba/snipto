@@ -27,6 +27,7 @@ _ide_helper.php
 docker/crowdsec/crowdsec-openresty-bouncer.conf
 .pentest/
 .hermes/
+/tasks/
 
 # Playwright E2E artifacts
 test-results/

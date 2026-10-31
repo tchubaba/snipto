@@ -323,12 +323,26 @@ export function sniptoComponent() {
                     const plainBytes = new TextEncoder().encode(revealed.payload);
                     this.$nextTick(() => this.renderPayload(plainBytes));
                 } else if (this.protectionType === 1) {
-                    // Mode 1: URL Secret
+                    // Mode 1: URL Secret — the probe response already carries the
+                    // nonce and a still-valid reveal_token, so derive here and go
+                    // straight to the reveal POST (one GET + one POST, like Mode 2).
                     if (!shortSecretBytes) {
                         this.setDecryptError('rusk_missing');
                         return;
                     }
-                    await this.retrieveAndDecrypt(shortSecretBytes);
+                    let derived;
+                    try {
+                        derived = await this.deriveKeys(shortSecretBytes, data.nonce);
+                    } catch {
+                        this.setDecryptError('integrity');
+                        return;
+                    }
+                    await this.retrieveAndDecrypt({
+                        secretHash: derived.keyHash,
+                        encKey: derived.encKey,
+                        hmacKey: derived.hmacKey,
+                        nonceHex: data.nonce,
+                    });
                 } else if (this.protectionType === 2) {
                     // Mode 2: Password — nonce is returned pre-auth so the client can
                     // reproduce the Argon2id+HKDF derivation that produces key_hash.
@@ -417,31 +431,12 @@ export function sniptoComponent() {
             return !!this.revealToken;
         },
 
-        async retrieveAndDecrypt(secretBytes, preDerived = null) {
+        // Both encrypted modes arrive here fully pre-derived from init()'s single
+        // page-load probe: the nonce and the still-valid reveal_token came from it,
+        // so retrieval is exactly one GET + one POST. (A prior failed attempt burned
+        // the token, so ensureRevealToken() re-probes in that case.)
+        async retrieveAndDecrypt(preDerived) {
             try {
-                // URL Secret (Mode 1): derive key_hash from Argon2id master via HKDF, which
-                // requires the nonce. The nonce is only available from a pre-auth GET request,
-                // so we do a two-step approach: first fetch to get the nonce, then derive
-                // key_hash and fetch again with it.
-                if (this.protectionType === 1 && !preDerived) {
-                    const res = await fetch(`/api/snipto/${this.slug}`, {
-                        method: 'GET',
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    if (!res.ok) throw new Error();
-                    const data = await res.json();
-                    this.revealToken = data.reveal_token || this.revealToken;
-                    this.revealTokenConsumed = false;
-                    const nonceHex = data.nonce;
-                    const derived = await this.deriveKeys(secretBytes, nonceHex);
-                    return this.retrieveAndDecrypt(null, {
-                        secretHash: derived.keyHash,
-                        encKey: derived.encKey,
-                        hmacKey: derived.hmacKey,
-                        nonceHex,
-                    });
-                }
-
                 const secretHash = preDerived.secretHash;
 
                 // A previous failed attempt consumed the token (the server burns it
@@ -471,11 +466,9 @@ export function sniptoComponent() {
                 if (!res.ok) throw new Error();
 
                 const data = await res.json();
-                const nonceHex = preDerived ? preDerived.nonceHex : data.nonce;
+                const nonceHex = preDerived.nonceHex;
                 this.nonce = this.hexToBytes(nonceHex);
-                const { encKey, hmacKey } = preDerived
-                    ? preDerived
-                    : await this.deriveKeys(secretBytes, nonceHex);
+                const { encKey, hmacKey } = preDerived;
 
                 const payloadBytes = this.base64ToBytes(data.payload);
                 const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, this.nonce, hmacKey, nonceHex);
@@ -507,7 +500,7 @@ export function sniptoComponent() {
             pwdBytes.fill(0);
             this.protectionPassword = '';
 
-            await this.retrieveAndDecrypt(null, {
+            await this.retrieveAndDecrypt({
                 secretHash: keyHash,
                 encKey,
                 hmacKey,

@@ -1,8 +1,19 @@
 # Snipto
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Tests](https://github.com/tchubaba/snipto/actions/workflows/test.yml/badge.svg)](https://github.com/tchubaba/snipto/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/tchubaba/snipto)](https://github.com/tchubaba/snipto/releases)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tchubaba/snipto)](https://hub.docker.com/r/tchubaba/snipto)
 
 **Snipto** is a secure, lightweight online snippet sharing service. It allows users to quickly create and share text snippets via unique URLs, with **end-to-end encryption**, ephemeral storage, and QR code integration. Snipto is designed for personal use, teams, and anyone who wants a private alternative to public paste services.
+
+## Security
+
+- **[Threat Model](docs/THREAT_MODEL.md)** — what Snipto protects against, what it explicitly does *not*, and exactly what the server can see. Read this first.
+- **[How the Crypto Works](docs/CRYPTO.md)** — implementation-accurate walkthrough: Argon2id (OWASP strong tier), HKDF key splitting, memory-hard `key_hash`, X25519 with full public-key validation (RFC 9496).
+- **[Security Policy](SECURITY.md)** — how to report a vulnerability.
+
+All encryption happens in your browser. The server stores ciphertext and metadata only — never plaintext, keys, or passphrases. Docker images are signed with Sigstore/cosign; base images are pinned by digest.
 
 ---
 

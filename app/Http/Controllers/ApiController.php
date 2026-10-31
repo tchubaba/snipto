@@ -145,36 +145,63 @@ class ApiController extends Controller
                 && $token !== ''
                 && hash_equals($snipto->reveal_token_hash, hash('sha256', $token));
 
-            // Consume the token regardless of the outcome of this attempt.
+            // key_hash is only ever compared when the token itself checked out —
+            // same ordering as before, so a bad token never yields a key_hash oracle.
+            $keyHashOk = true;
+            if ($tokenOk && $snipto->isEncrypted()) {
+                $keyHash   = $request->string('key_hash')->toString();
+                $keyHashOk = $keyHash !== '' && hash_equals((string) $snipto->key_hash, $keyHash);
+            }
+
+            // A reveal attempt always consumes its token, right or wrong — but the
+            // consumption is now paid for in at most ONE write. Every row the
+            // current API can create is single-view (store() forces 1 and migration
+            // 2026_10_20_190200 made the column NOT NULL), so a successful reveal
+            // deletes the row outright: the old token-nulling UPDATE and the
+            // view-decrement UPDATE only churned a row this same transaction then
+            // removed. A null views_remaining (unreachable since the tightening
+            // migration) is treated fail-closed — delete, never "unlimited".
+            if ($tokenOk && $keyHashOk) {
+                if ((int) $snipto->views_remaining <= 1) {
+                    $snipto->delete();
+
+                    return response()->json([
+                        'success'         => true,
+                        'protection_type' => $snipto->protection_type->value,
+                        'payload'         => $snipto->payload,
+                        'nonce'           => $snipto->nonce,
+                        'views_remaining' => 0,
+                    ]);
+                }
+
+                // Multi-view stragglers: null the token and decrement the counter
+                // in a single UPDATE. The FOR UPDATE lock makes the in-memory
+                // arithmetic safe for the duration of this transaction.
+                $snipto->views_remaining -= 1;
+                $snipto->reveal_token_hash       = null;
+                $snipto->reveal_token_expires_at = null;
+                $snipto->save();
+
+                return response()->json([
+                    'success'         => true,
+                    'protection_type' => $snipto->protection_type->value,
+                    'payload'         => $snipto->payload,
+                    'nonce'           => $snipto->nonce,
+                    'views_remaining' => $snipto->views_remaining,
+                ]);
+            }
+
+            // Failed attempt: the row survives, so burn the token with exactly one
+            // UPDATE (save() issues no query when nothing was dirty — e.g. an
+            // already-consumed token whose fields are already null).
             $snipto->reveal_token_hash       = null;
             $snipto->reveal_token_expires_at = null;
             $snipto->save();
 
-            if ( ! $tokenOk) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Reveal token invalid or expired.',
-                ], 403);
-            }
-
-            if ($snipto->isEncrypted()) {
-                $keyHash = $request->string('key_hash')->toString();
-
-                if ($keyHash === '' || ! hash_equals((string) $snipto->key_hash, $keyHash)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Key Hash invalid.',
-                    ], 403);
-                }
-            }
-
             return response()->json([
-                'success'         => true,
-                'protection_type' => $snipto->protection_type->value,
-                'payload'         => $snipto->payload,
-                'nonce'           => $snipto->nonce,
-                'views_remaining' => $snipto->decrementViews(),
-            ]);
+                'success' => false,
+                'message' => $tokenOk ? 'Key Hash invalid.' : 'Reveal token invalid or expired.',
+            ], 403);
         });
     }
 

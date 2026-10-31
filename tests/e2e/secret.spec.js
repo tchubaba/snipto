@@ -28,10 +28,13 @@ test('url-secret create -> fragment-only key -> retrieve', async ({ newContext }
     expect(reveal.length).toBe(1);
     expect(reveal[0].method()).toBe('POST');
 
-    // Probe GET must precede the reveal POST.
-    const probe = apiRequests.find((r) => r.method() === 'GET' && r.url().endsWith(`/api/snipto/${slug}`));
-    expect(probe).toBeTruthy();
-    expect(apiRequests.indexOf(probe)).toBeLessThan(apiRequests.indexOf(reveal[0]));
+    // Probe GET must precede the reveal POST — and there must be exactly ONE
+    // probe. Mode 1 used to re-GET inside retrieveAndDecrypt for the nonce and
+    // a fresh token; the page-load probe already returns both, and each extra
+    // GET overwrites the token and spends a show-snipto throttle slot.
+    const probes = apiRequests.filter((r) => r.method() === 'GET' && r.url().endsWith(`/api/snipto/${slug}`));
+    expect(probes.length).toBe(1);
+    expect(apiRequests.indexOf(probes[0])).toBeLessThan(apiRequests.indexOf(reveal[0]));
 
     // Zero-knowledge pin: secrets never appear in any request URL.
     for (const r of apiRequests) {
