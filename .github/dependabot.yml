@@ -17,3 +17,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  # Monitor npm (frontend) dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
