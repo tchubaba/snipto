@@ -30,14 +30,17 @@ export default defineConfig({
                 {
                     src: 'resources/js/snipto.js',
                     dest: 'js',
+                    rename: { stripBase: true },
                 },
                 {
                     src: 'resources/js/sniptoid.js',
                     dest: 'js',
+                    rename: { stripBase: true },
                 },
                 {
                     src: 'resources/js/wordlists/*',
                     dest: 'js/wordlists',
+                    rename: { stripBase: true },
                 },
             ],
         }),
