@@ -71,6 +71,17 @@ class ApiRateLimitingTest extends TestCase
         'offense_ttl'     => 7200,
     ];
 
+    /**
+     * PUT /api/snipto/{slug}/payload — 5/2min, then 2/10min, then 12h lockout.
+     * Each attempt carries a large body, so the tier set is stricter than
+     * store-snipto by design (50 MiB x 5/2min is the practical DoS ceiling).
+     */
+    private const UPLOAD_LIMITER = [
+        'tiers'           => [[5, 120], [2, 600]],
+        'lockout_seconds' => 43200,
+        'offense_ttl'     => 7200,
+    ];
+
     private const MISSING_SLUG = 'no-such-snipto';
 
     private int $created = 0;
@@ -102,6 +113,7 @@ class ApiRateLimitingTest extends TestCase
         $this->assertSame(self::SHOW_LIMITER, config('tiered-throttle.limiters.show-snipto'));
         $this->assertSame(self::STORE_LIMITER, config('tiered-throttle.limiters.store-snipto'));
         $this->assertSame(self::REVEAL_LIMITER, config('tiered-throttle.limiters.reveal-snipto'));
+        $this->assertSame(self::UPLOAD_LIMITER, config('tiered-throttle.limiters.upload-snipto'));
     }
 
     #[Test]
@@ -328,6 +340,37 @@ class ApiRateLimitingTest extends TestCase
     }
 
     // ---------------------------------------------------------------------
+    // PUT /api/snipto/{slug}/payload — upload-snipto
+    // ---------------------------------------------------------------------
+
+    #[Test]
+    public function upload_snipto_allows_five_uploads_per_two_minutes_then_escalates_and_locks_out(): void
+    {
+        // Tier 0: 5 uploads per 2 minutes.
+        $this->allowUploads(5);
+        $blocked = $this->uploadBlocked();
+        $blocked->assertHeader('X-RateLimit-Reset');
+        $blocked->assertHeader('Retry-After');
+
+        // Tier 1: 2 uploads per 10 minutes; the 3rd triggers the 12-hour lockout.
+        $this->travel(121)->seconds();
+        $this->allowUploads(2);
+
+        $locked = $this->uploadBlocked();
+        $locked->assertHeader('X-RateLimit-Lockout', '1');
+    }
+
+    #[Test]
+    public function exhausting_the_upload_limiter_leaves_the_other_limiters_alone(): void
+    {
+        $this->allowUploads(5);
+        $this->uploadBlocked();
+
+        $this->getJson('/api/snipto/'.self::MISSING_SLUG)->assertNotFound();
+        $this->createSnipto()->assertOk();
+    }
+
+    // ---------------------------------------------------------------------
     // Which address the limiter keys on
     // ---------------------------------------------------------------------
 
@@ -442,6 +485,22 @@ class ApiRateLimitingTest extends TestCase
     private function revealBlocked(): TestResponse
     {
         $response = $this->postJson('/api/snipto/'.self::MISSING_SLUG.'/reveal', ['reveal_token' => 'ff']);
+        $response->assertStatus(429);
+
+        return $response;
+    }
+
+    private function allowUploads(int $times): void
+    {
+        for ($i = 0; $i < $times; $i++) {
+            $this->putJson('/api/snipto/'.self::MISSING_SLUG.'/payload')
+                ->assertNotFound();
+        }
+    }
+
+    private function uploadBlocked(): TestResponse
+    {
+        $response = $this->putJson('/api/snipto/'.self::MISSING_SLUG.'/payload');
         $response->assertStatus(429);
 
         return $response;

@@ -113,6 +113,44 @@ function x25519PeerKeyValid(pubBytes) {
     return x25519Ladder(X25519_ORDER, u) === 0n;
 }
 
+// FILE-ENVELOPE-BEGIN — tests/js/file-envelope.test.mjs extracts this block via the markers.
+function buildFileEnvelope(fileName, mimeType, fileBytes) {
+    const header = new TextEncoder().encode(JSON.stringify({
+        n: fileName,
+        m: mimeType,
+        s: fileBytes.length,
+    }));
+    if (header.length === 0 || header.length > 0xFFFF) {
+        throw new Error('Invalid file envelope header');
+    }
+    const out = new Uint8Array(2 + header.length + fileBytes.length);
+    out[0] = (header.length >> 8) & 0xFF;
+    out[1] = header.length & 0xFF;
+    out.set(header, 2);
+    out.set(fileBytes, 2 + header.length);
+    return out;
+}
+
+function parseFileEnvelope(decryptedBytes) {
+    if (decryptedBytes.length < 3) {
+        throw new Error('File envelope too short');
+    }
+    const headerLen = (decryptedBytes[0] << 8) | decryptedBytes[1];
+    if (headerLen === 0 || 2 + headerLen > decryptedBytes.length) {
+        throw new Error('Malformed file envelope header');
+    }
+    const header = JSON.parse(
+        new TextDecoder('utf-8', { fatal: true }).decode(decryptedBytes.slice(2, 2 + headerLen))
+    );
+    if (!header || typeof header !== 'object'
+        || typeof header.n !== 'string' || typeof header.m !== 'string'
+        || header.s !== decryptedBytes.length - 2 - headerLen) {
+        throw new Error('File envelope metadata mismatch');
+    }
+    return { name: header.n, mime: header.m, bytes: decryptedBytes.slice(2 + headerLen) };
+}
+// FILE-ENVELOPE-END
+
 export function sniptoComponent() {
     return {
         slug: null,
@@ -134,6 +172,14 @@ export function sniptoComponent() {
         showSuccess: false,
         errorMessage: '',
         userInput: '',
+        // File-sharing create flow (kind='file'). The bytes never leave the
+        // browser except as AES-GCM ciphertext of buildFileEnvelope()'s output;
+        // the server stores the PUT body as an opaque blob.
+        uploadMode: false,
+        selectedFile: null,
+        uploadPercent: null, // null when idle; 0-100 during the PUT phase
+        pendingUploadToken: null, // retained if PUT drops so a retry can reset the row
+        maxFileBytes: 50 * 1024 * 1024, // overridden from data-max-file-bytes
         // Create-form editor. Never affects the payload view.
         editorFocused: false,
         editorLine: 1,
@@ -176,6 +222,12 @@ export function sniptoComponent() {
         showLanguageWarningModal: false,
         pendingLanguageForm: null,
         decryptError: '', // '' | 'rusk_missing' | 'rusk_invalid' | 'integrity' | 'network'
+        // Viewer side of file sharing: kind arrives with the metadata probe;
+        // fileMeta/fileBytes are populated once the envelope decrypts.
+        kind: 'text',
+        metadataNonceHex: null, // mode-3 nonce: binary reveals carry no JSON
+        fileMeta: null, // { name, sizeMb, mime } for the download card
+        fileBytes: null, // decrypted bytes, held only for the download button
 
         setDecryptError(variant) {
             this.decryptError = variant;
@@ -212,6 +264,25 @@ export function sniptoComponent() {
             return (this.slug || '').length < 8;
         },
 
+        // Single source of truth for the "Snipto it" button's disabled state.
+        // The button is only clickable when the CURRENT mode's requirements are
+        // actually met, so an incomplete form can never fire the submit-time
+        // guards (empty text, short password, malformed Snipto ID, no file) as
+        // toasts - the button simply stays inert. Deliberately does NOT check
+        // password STRENGTH here: the weak-password modal with its
+        // "Use anyway" bypass is the designed path for that. The deeper
+        // X25519 ladder validation of a typed recipient ID (audit F-2) also
+        // stays at submit time - the getter only pins cheap requirements.
+        get submitReady() {
+            if (this.isThrottled || this.isLockedOut || this.uploadPercent !== null) return false;
+            if (this.uploadMode) return !!this.selectedFile;
+            if (!this.userInput.trim()) return false;
+            const mode = parseInt(this.protectionType, 10);
+            if (mode === 2) return this.protectionPassword.length >= 12;
+            if (mode === 3) return /^[A-Za-z0-9+/]{64}$/.test(this.sniptoIdInput.trim());
+            return true;
+        },
+
         // "Create one for me": the slug is below every creation floor, so offer a
         // memorable 3-word diceware slug (hyphen-joined; ~31 bits on the English
         // EFF short list, ~37-38 bits on the larger locale lists) and reload the
@@ -228,6 +299,9 @@ export function sniptoComponent() {
 
         async init() {
             this.slug = this.$el.dataset.slug || '';
+            if (this.$el.dataset.maxFileBytes) {
+                this.maxFileBytes = parseInt(this.$el.dataset.maxFileBytes, 10);
+            }
             if (this.calledInit) return;
             this.calledInit = true;
 
@@ -301,6 +375,8 @@ export function sniptoComponent() {
 
                 const data = await res.json();
                 this.protectionType = data.protection_type;
+                this.kind = data.kind || 'text';
+                if (data.nonce) this.metadataNonceHex = data.nonce;
                 this.revealToken = data.reveal_token || null;
                 this.revealTokenConsumed = false;
 
@@ -436,6 +512,7 @@ export function sniptoComponent() {
         // so retrieval is exactly one GET + one POST. (A prior failed attempt burned
         // the token, so ensureRevealToken() re-probes in that case.)
         async retrieveAndDecrypt(preDerived) {
+            let payloadBytes = null;
             try {
                 const secretHash = preDerived.secretHash;
 
@@ -465,24 +542,31 @@ export function sniptoComponent() {
 
                 if (!res.ok) throw new Error();
 
-                const data = await res.json();
                 const nonceHex = preDerived.nonceHex;
                 this.nonce = this.hexToBytes(nonceHex);
                 const { encKey, hmacKey } = preDerived;
 
-                const payloadBytes = this.base64ToBytes(data.payload);
+                const revealed = await this.revealedPayload(res);
+                payloadBytes = revealed.bytes;
                 const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, this.nonce, hmacKey, nonceHex);
+                payloadBytes.fill(0);
+                payloadBytes = null;
                 const decryptedBytes = new Uint8Array(decryptedBuffer);
 
-                this.showPayload = true;
                 this.showPasswordPrompt = false;
 
-                await this.$nextTick();
-                this.renderPayload(decryptedBytes);
+                if (this.kind === 'file') {
+                    this.showFilePayload(parseFileEnvelope(decryptedBytes));
+                } else {
+                    this.showPayload = true;
+                    await this.$nextTick();
+                    this.renderPayload(decryptedBytes);
+                }
                 decryptedBytes.fill(0);
 
                 this.clearSensitiveRetrieval();
             } catch (err) {
+                if (payloadBytes) payloadBytes.fill(0);
                 this.setDecryptError('integrity');
             }
         },
@@ -515,6 +599,50 @@ export function sniptoComponent() {
             this.$nextTick(() => {
                 this.$refs.protectionPasswordField?.focus();
             });
+        },
+
+        // File reveals answer with the raw ciphertext as the body; text
+        // reveals keep the JSON+base64 envelope. Branch on Content-Type.
+        async revealedPayload(res) {
+            const ct = res.headers.get('Content-Type') || '';
+            if (ct.includes('application/octet-stream')) {
+                return { bytes: new Uint8Array(await res.arrayBuffer()), json: null };
+            }
+            const data = await res.json();
+            return { bytes: this.base64ToBytes(data.payload), json: data };
+        },
+
+        // Decrypted envelope -> download card. The envelope's mime is
+        // sender-supplied metadata: displayed as text, never used to type the
+        // Blob (always opaque octet-stream) and never trusted for behaviour.
+        // Strips path separators, ASCII/C1 control characters, and Unicode Bidi
+        // overrides (U+200E/F, U+202A-202E, U+2066-2069) to prevent RLO
+        // extension spoofing on the download card.
+        showFilePayload(envelope) {
+            const cleaned = envelope.name
+                .replace(/[\\/\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '_')
+                .trim();
+            const safeName = (!cleaned || /^\.+$/.test(cleaned) ? 'snipto' : cleaned).slice(0, 200);
+            this.fileMeta = {
+                name: safeName,
+                sizeMb: (envelope.bytes.length / 1048576).toFixed(2),
+                mime: envelope.mime,
+            };
+            this.fileBytes = envelope.bytes;
+            this.showPayload = true;
+        },
+
+        saveFilePayload() {
+            if ( ! this.fileBytes) return;
+            const blob = new Blob([this.fileBytes], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = this.fileMeta.name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
         },
 
         renderPayload(decryptedBytes) {
@@ -824,14 +952,40 @@ export function sniptoComponent() {
             // once it doesn't.
             const available = Math.min(mainBox, window.innerHeight - padY);
 
-            const chrome = card.getBoundingClientRect().height - shell.getBoundingClientRect().height;
+            // "chrome" is everything in the card except the content-panel slot.
+            // The text block (editor + status strip) and the file drop zone
+            // share ONE grid cell (col/row-start-1), so the cell's own height
+            // is always exactly one slot - whether either panel is hidden or
+            // both are mid-crossfade. Measuring chrome as card minus cell is
+            // therefore immune to the Text/File transition, while subtracting
+            // individual panel rects would let a half-visible layout feed the
+            // ResizeObserver an inconsistent figure and make the card wobble.
+            const grid = this.$refs.panelGrid;
+            const filePanel = this.$refs.filePanel;
+            const gridH = grid ? grid.getBoundingClientRect().height : 0;
+            if (gridH <= 0) return;
+            const chrome = card.getBoundingClientRect().height - gridH;
             if (available <= 0 || chrome <= 0) return;
 
+            const shellH = shell.getBoundingClientRect().height;
+            const textPanel = this.$refs.textPanel;
+            const textH = textPanel ? textPanel.getBoundingClientRect().height : 0;
+            // The status strip + gaps that live in the text block around the
+            // editor shell; cached from the last time text mode was laid out,
+            // so file mode can reproduce the same slot height without it visible.
+            if (shellH > 0 && textH > 0) {
+                this._textPanelExtra = Math.max(0, textH - shellH);
+            }
+
             const floor = parseFloat(getComputedStyle(shell).getPropertyValue('--editor-min-height'));
-            shell.style.height = Math.max(
+            const editorH = Math.max(
                 Number.isFinite(floor) && floor > 0 ? floor : this.EDITOR_MIN_HEIGHT_FALLBACK,
                 available - chrome
-            ) + 'px';
+            );
+            shell.style.height = editorH + 'px';
+            if (filePanel) {
+                filePanel.style.height = (editorH + (this._textPanelExtra || 0)) + 'px';
+            }
         },
 
         // Switching protection mode changes how tall the controls block is —
@@ -1050,6 +1204,10 @@ export function sniptoComponent() {
             if (this.throttleInterval) {
                 clearInterval(this.throttleInterval);
             }
+            if (this.fileBytes) {
+                this.fileBytes.fill(0);
+                this.fileBytes = null;
+            }
             this.clearSensitiveRetrieval();
         },
 
@@ -1068,10 +1226,103 @@ export function sniptoComponent() {
             }
         },
 
-        async submitSnipto(bypass = false) {
-            if (!this.userInput.trim()) return;
+        // What actually gets encrypted: the file envelope in file mode, the
+        // encoded textarea otherwise. The returned `plain` buffer is the inner
+        // copy to zero afterwards (same object as `envelope` for text mode).
+        async plainBytesForSubmit() {
+            if (!this.uploadMode) {
+                const plain = new TextEncoder().encode(this.userInput);
+                return { plain, envelope: plain };
+            }
+            const buf = new Uint8Array(await this.selectedFile.arrayBuffer());
+            const envelope = buildFileEnvelope(
+                this.selectedFile.name,
+                this.selectedFile.type || 'application/octet-stream',
+                buf
+            );
+            buf.fill(0);
+            return { plain: null, envelope };
+        },
 
+        // Raw-binary upload of the encrypted envelope. fetch() exposes no
+        // upload progress events; XHR's upload.onprogress drives the bar.
+        uploadFileBytes(slug, token, bytes) {
+            return new Promise((resolve) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('PUT', `/api/snipto/${encodeURIComponent(slug)}/payload`);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                xhr.setRequestHeader('X-Upload-Token', token);
+                xhr.setRequestHeader('X-CSRF-TOKEN', this.getCsrfToken());
+                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) this.uploadPercent = Math.round((e.loaded / e.total) * 100);
+                };
+                const finish = (value) => resolve(value);
+                xhr.onload = () => finish({ status: xhr.status, xhr });
+                xhr.onerror = () => finish({ status: 0, xhr });
+                xhr.ontimeout = () => finish({ status: -1, xhr });
+                xhr.send(bytes);
+            });
+        },
+
+        // The CSP-compatible Alpine parser only accepts single expressions,
+        // so the multi-statement reset lives here: plaintext mode can never
+        // carry a file selection (server 422s the combo anyway).
+        selectPlaintextMode() {
+            this.protectionType = 0;
+            this.uploadMode = false;
+            this.removeFile();
+        },
+
+        setFile(file) {
+            if (!file) return;
+            if (this.protectionType === 0) {
+                this.showToastMessage(this.t('Files are only supported in protected modes.'));
+                return;
+            }
+            if (file.size > this.maxFileBytes) {
+                this.showToastMessage(this.t('File too large. Maximum size is :size MB.', { ':size': Math.floor(this.maxFileBytes / 1048576) }));
+                return;
+            }
+            this.selectedFile = file;
+        },
+
+        handleDrop(event) {
+            const file = event.dataTransfer?.files?.[0];
+            if (file) this.setFile(file);
+        },
+
+        removeFile() {
+            this.selectedFile = null;
+            this.uploadPercent = null;
+            if (this.$refs.fileInput) this.$refs.fileInput.value = '';
+        },
+
+        fileSummary() {
+            if (!this.selectedFile) return '';
+            const mb = (this.selectedFile.size / 1048576).toFixed(1);
+            return `${this.selectedFile.name} (${mb} MB)`;
+        },
+
+        async submitSnipto(bypass = false) {
             const finalProtectionType = parseInt(this.protectionType);
+
+            // Files are encrypted-only (the server 422s kind=file with
+            // protection_type=0 too), and a file submission needs a file
+            // selection instead of textarea text.
+            if (this.uploadMode && finalProtectionType === 0) {
+                this.showToastMessage(this.t('Files are only supported in protected modes.'));
+                return;
+            }
+            if (this.uploadMode) {
+                if (!this.selectedFile) return;
+                if (this.selectedFile.size > this.maxFileBytes) {
+                    this.showToastMessage(this.t('File too large. Maximum size is :size MB.', { ':size': Math.floor(this.maxFileBytes / 1048576) }));
+                    return;
+                }
+            } else if (!this.userInput.trim()) {
+                return;
+            }
 
             // Validation: Password length
             if (finalProtectionType === 2) {
@@ -1090,7 +1341,7 @@ export function sniptoComponent() {
             this.loading = true;
             this.showWeakPasswordModal = false;
 
-            let payloadToSend, nonceHex, secretHash, shortSecretStr;
+            let payloadToSend, payloadBytes = null, nonceHex, secretHash, shortSecretStr;
 
             let senderPublicKey = null;
             let keyProviderType = null;
@@ -1119,12 +1370,14 @@ export function sniptoComponent() {
                 this.key = derived.encKey;
                 this.hmacKey = derived.hmacKey;
 
-                const userInputBytes = new TextEncoder().encode(this.userInput);
-                payloadToSend = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
+                const { plain, envelope } = await this.plainBytesForSubmit();
+                payloadBytes = await this.encryptPayloadBytes(envelope, this.key, this.nonce, this.hmacKey, nonceHex);
+                payloadToSend = this.uploadMode ? payloadBytes : this.bytesToBase64(payloadBytes);
                 secretHash = derived.keyHash;
 
                 // Clean up sensitive bytes
-                userInputBytes.fill(0);
+                envelope.fill(0);
+                if (plain && plain !== envelope) plain.fill(0);
                 secretBytes.fill(0);
             } else if (finalProtectionType === 3) {
                 // E2EE Mode (Snipto ID / Asymmetric)
@@ -1180,8 +1433,9 @@ export function sniptoComponent() {
                 this.key = encKey;
                 this.hmacKey = hmacKey;
 
-                const userInputBytes = new TextEncoder().encode(this.userInput);
-                payloadToSend = await this.encryptPayload(userInputBytes, this.key, this.nonce, this.hmacKey, nonceHex);
+                const { plain, envelope } = await this.plainBytesForSubmit();
+                payloadBytes = await this.encryptPayloadBytes(envelope, this.key, this.nonce, this.hmacKey, nonceHex);
+                payloadToSend = this.uploadMode ? payloadBytes : this.bytesToBase64(payloadBytes);
 
                 // key_hash = SHA-256 of the ECDH shared secret (not the public key)
                 secretHash = await this.sha256Hex(sharedBytes);
@@ -1190,7 +1444,8 @@ export function sniptoComponent() {
                 keyProviderType = 'passphrase';
                 shortSecretStr = null;
 
-                userInputBytes.fill(0);
+                envelope.fill(0);
+                if (plain && plain !== envelope) plain.fill(0);
             } else {
                 // Plaintext mode
                 payloadToSend = this.userInput;
@@ -1216,11 +1471,15 @@ export function sniptoComponent() {
                     },
                     body: JSON.stringify({
                         slug: this.slug,
-                        payload: payloadToSend,
+                        kind: this.uploadMode ? 'file' : 'text',
+                        payload: this.uploadMode ? null : payloadToSend,
                         nonce: nonceHex,
                         key_hash: secretHash,
                         protection_type: finalProtectionType,
                         expiration: this.expirationValue,
+                        ...(this.uploadMode && this.pendingUploadToken ? {
+                            upload_token: this.pendingUploadToken,
+                        } : {}),
                         ...(finalProtectionType === 3 ? {
                             sender_public_key: senderPublicKey,
                             key_provider_type: keyProviderType,
@@ -1242,6 +1501,34 @@ export function sniptoComponent() {
                 }
 
                 this.slug = body.slug;
+
+                // kind='file' rows hold no blob until the raw PUT lands. The
+                // success screen appears only once the ciphertext has arrived;
+                // a failed PUT leaves the row invisible (404 on any probe),
+                // and sniptos:purge reaps it when the upload token expires.
+                if (this.uploadMode) {
+                    this.pendingUploadToken = body.upload_token || null;
+                    const up = await this.uploadFileBytes(body.slug, body.upload_token, payloadBytes);
+                    payloadBytes.fill(0);
+                    payloadBytes = null;
+                    this.uploadPercent = null;
+                    if (up.status < 200 || up.status >= 300) {
+                        this.loading = false;
+                        this.removeFile();
+                        if (up.status === 429) {
+                            this.handleThrottling({ headers: { get: (h) => up.xhr.getResponseHeader(h) } });
+                        } else if (up.status === 413) {
+                            this.showToastMessage(this.t('File too large. Maximum size is :size MB.', { ':size': Math.floor(this.maxFileBytes / 1048576) }));
+                        } else {
+                            this.showToastMessage(this.t('Upload failed. The connection dropped — please try again.'));
+                        }
+                        return;
+                    }
+                    this.pendingUploadToken = null;
+                    this.uploadMode = false;
+                    this.removeFile();
+                }
+
                 this.showForm = false;
                 this.showSuccess = true;
 
@@ -1252,11 +1539,14 @@ export function sniptoComponent() {
 
                 QRCode.toCanvas(this.$refs.qrcode, this.fullUrl, { width: 256, margin: 2 });
                 this.$refs.fullUrlInput.select();
-
-                this.clearSensitiveCreation();
             } catch {
                 this.errorMessage = this.t('An error occurred. Please try again.');
             } finally {
+                if (payloadBytes) {
+                    payloadBytes.fill(0);
+                    payloadBytes = null;
+                }
+                this.clearSensitiveCreation();
                 this.loading = false;
             }
         },
@@ -1366,6 +1656,7 @@ export function sniptoComponent() {
                 return;
             }
 
+            let payloadBytes = null;
             try {
                 const saltBytes = this.base64ToBytes(this.recipientSalt);
                 const { privateKeyBytes, publicKeyBase64 } = await this.deriveX25519KeyPair(this.sniptoIdPassphrase, saltBytes);
@@ -1401,22 +1692,31 @@ export function sniptoComponent() {
 
                 if (!res.ok) throw new Error();
 
-                const data = await res.json();
-
-                const nonce = this.hexToBytes(data.nonce);
-                const payloadBytes = this.base64ToBytes(data.payload);
-                const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, nonce, hmacKey, data.nonce);
+                const revealed = await this.revealedPayload(res);
+                payloadBytes = revealed.bytes;
+                // Text reveals carry the nonce in the JSON; file-mode binary
+                // bodies do not, so fall back to the metadata probe's nonce.
+                const nonceHex = revealed.json ? revealed.json.nonce : this.metadataNonceHex;
+                const nonce = this.hexToBytes(nonceHex);
+                const decryptedBuffer = await this.decryptPayload(payloadBytes, encKey, nonce, hmacKey, nonceHex);
+                payloadBytes.fill(0);
+                payloadBytes = null;
                 const decryptedBytes = new Uint8Array(decryptedBuffer);
 
-                this.showPayload = true;
                 this.showSniptoIdPrompt = false;
 
-                await this.$nextTick();
-                this.renderPayload(decryptedBytes);
+                if (this.kind === 'file') {
+                    this.showFilePayload(parseFileEnvelope(decryptedBytes));
+                } else {
+                    this.showPayload = true;
+                    await this.$nextTick();
+                    this.renderPayload(decryptedBytes);
+                }
                 decryptedBytes.fill(0);
 
                 this.clearSensitiveRetrieval();
             } catch (err) {
+                if (payloadBytes) payloadBytes.fill(0);
                 this.sniptoIdPassphrase = '';
                 this.setDecryptError('integrity');
                 return;
@@ -1564,62 +1864,69 @@ export function sniptoComponent() {
             return { encKey, hmacKey, keyHash };
         },
 
-        async encryptPayload(plainBytes, encKey, nonce, hmacKey, nonceHex) {
+        // Byte-for-byte identical output to encryptPayload — the raw-bytes core
+        // is exposed so file mode can skip base64 entirely (50 MiB through
+        // bytesToBase64's byte-at-a-time string building is fatal). Text-mode
+        // call sites keep calling encryptPayload below.
+        async encryptPayloadBytes(plainBytes, encKey, nonce, hmacKey, nonceHex) {
             const encrypted = await crypto.subtle.encrypt(
                 { name: 'AES-GCM', iv: nonce, tagLength: 128 },
                 encKey,
                 plainBytes
             );
 
+            // WebCrypto AES-GCM output is already ciphertext || authTag (16B).
             const encryptedBytes = new Uint8Array(encrypted);
-            const ciphertext = encryptedBytes.slice(0, -16);
-            const authTag = encryptedBytes.slice(-16);
 
-            let payload = new Uint8Array(ciphertext.length + authTag.length);
-            payload.set(ciphertext);
-            payload.set(authTag, ciphertext.length);
-
-            if (hmacKey) {
-                const enc = new TextEncoder();
-                const hmacData = new Uint8Array(ciphertext.length + authTag.length + nonceHex.length);
-                hmacData.set(ciphertext, 0);
-                hmacData.set(authTag, ciphertext.length);
-                hmacData.set(enc.encode(nonceHex), ciphertext.length + authTag.length);
-                const hmac = await crypto.subtle.sign({ name: 'HMAC' }, hmacKey, hmacData);
-                const hmacBytes = new Uint8Array(hmac);
-                const fullPayload = new Uint8Array(payload.length + hmacBytes.length);
-                fullPayload.set(payload);
-                fullPayload.set(hmacBytes, payload.length);
-                payload = fullPayload;
+            if (!hmacKey) {
+                return encryptedBytes;
             }
 
-            return this.bytesToBase64(payload);
+            const nonceBytes = new TextEncoder().encode(nonceHex);
+            const hmacData = new Uint8Array(encryptedBytes.length + nonceBytes.length);
+            hmacData.set(encryptedBytes, 0);
+            hmacData.set(nonceBytes, encryptedBytes.length);
+            const hmac = await crypto.subtle.sign({ name: 'HMAC' }, hmacKey, hmacData);
+            hmacData.fill(0);
+            const hmacBytes = new Uint8Array(hmac);
+
+            const fullPayload = new Uint8Array(encryptedBytes.length + hmacBytes.length);
+            fullPayload.set(encryptedBytes, 0);
+            fullPayload.set(hmacBytes, encryptedBytes.length);
+            encryptedBytes.fill(0);
+
+            return fullPayload;
+        },
+
+        async encryptPayload(plainBytes, encKey, nonce, hmacKey, nonceHex) {
+            return this.bytesToBase64(
+                await this.encryptPayloadBytes(plainBytes, encKey, nonce, hmacKey, nonceHex)
+            );
         },
 
         async decryptPayload(payloadBytes, encKey, nonce, hmacKey, nonceHex) {
             const hmacLength = hmacKey ? 32 : 0;
             const authTagLength = 16;
 
-            const ciphertextLength = payloadBytes.length - authTagLength - hmacLength;
-            const ciphertext = payloadBytes.slice(0, ciphertextLength);
-            const authTag = payloadBytes.slice(ciphertextLength, ciphertextLength + authTagLength);
+            if (payloadBytes.length < authTagLength + hmacLength) {
+                throw new Error('Payload too short');
+            }
+
+            // Zero-copy view over ciphertext || authTag.
+            const encrypted = payloadBytes.subarray(0, payloadBytes.length - hmacLength);
 
             if (hmacKey) {
-                const hmacReceived = payloadBytes.slice(-hmacLength);
-                const enc = new TextEncoder();
-                const hmacData = new Uint8Array(ciphertext.length + authTag.length + nonceHex.length);
-                hmacData.set(ciphertext, 0);
-                hmacData.set(authTag, ciphertext.length);
-                hmacData.set(enc.encode(nonceHex), ciphertext.length + authTag.length);
+                const hmacReceived = payloadBytes.subarray(payloadBytes.length - hmacLength);
+                const nonceBytes = new TextEncoder().encode(nonceHex);
+                const hmacData = new Uint8Array(encrypted.length + nonceBytes.length);
+                hmacData.set(encrypted, 0);
+                hmacData.set(nonceBytes, encrypted.length);
                 const hmacComputed = await crypto.subtle.sign({ name: 'HMAC' }, hmacKey, hmacData);
+                hmacData.fill(0);
                 if (!this.timingSafeEqual(new Uint8Array(hmacComputed), hmacReceived)) {
                     throw new Error('HMAC verification failed');
                 }
             }
-
-            const encrypted = new Uint8Array(ciphertext.length + authTag.length);
-            encrypted.set(ciphertext);
-            encrypted.set(authTag, ciphertext.length);
 
             return await crypto.subtle.decrypt(
                 { name: 'AES-GCM', iv: nonce, tagLength: 128 },

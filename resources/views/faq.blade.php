@@ -14,8 +14,9 @@
                 <li><a href="#encryption-key" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('Where is the encryption key?') !!}</a></li>
                 <li><a href="#viewed" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('What happens to my Snipto after it’s viewed?') !!}</a></li>
                 <li><a href="#never-viewed" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('What happens if my snipto is never viewed?') !!}</a></li>
+                <li><a href="#file-sharing" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('How large a file can I share?') !!}</a></li>
+                <li><a href="#file-server-knowledge" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('What does the server know about a file I share?') !!}</a></li>
                 <li><a href="#lost-key" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('What if the decryption key is lost?') !!}</a></li>
-                <li><a href="#content-types" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('What kinds of content can I store?') !!}</a></li>
                 <li><a href="#personal-info" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('Is any personal information stored or collected with my Snipto?') !!}</a></li>
                 <li><a href="#snipto-id-identity" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('How is a Snipto ID generated? Is it linked to my identity?') !!}</a></li>
                 <li><a href="#end-to-end" class="text-indigo-600 dark:text-indigo-400 hover:underline">{!! __('How can I be sure my Snipto is end-to-end encrypted?') !!}</a></li>
@@ -83,17 +84,24 @@
                 </p>
             </div>
 
+            <div id="file-sharing" class="scroll-mt-13">
+                <h2 class="text-xl font-semibold mb-3 text-indigo-600 dark:text-indigo-400">{!! __('How large a file can I share?') !!}</h2>
+                <p>
+                    {!! __('You can share files up to 50 MiB, but only in one of the protected modes: URL secret, password, or Snipto ID. Your browser encrypts the file — its name and contents included — before anything is uploaded, so our servers only ever store opaque ciphertext. A file link can be downloaded exactly once; after that download the link and its encrypted copy are deleted. Uploads cannot be resumed, so if one fails or times out you have to start over.') !!}
+                </p>
+            </div>
+
+            <div id="file-server-knowledge" class="scroll-mt-13">
+                <h2 class="text-xl font-semibold mb-3 text-indigo-600 dark:text-indigo-400">{!! __('What does the server know about a file I share?') !!}</h2>
+                <p>
+                    {!! __('Not much: an opaque encrypted blob, its approximate size (ciphertext length is observable), the protection mode, and the creation and download timestamps. The file’s name, type, and contents are inside the encrypted envelope and never travel in the clear. If an upload is interrupted, the link 404s and the half-finished row is deleted within 30 minutes.') !!}
+                </p>
+            </div>
+
             <div id="lost-key" class="scroll-mt-13">
                 <h2 class="text-xl font-semibold mb-3 text-indigo-600 dark:text-indigo-400">{!! __('What if the decryption key is lost?') !!}</h2>
                 <p>
                     {!! __('If you lose the key (the <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">#</code> part of the URL, the password you chose, or the passphrase behind your Snipto ID), the Snipto cannot be decrypted. Since we never store or know your keys, passwords or passphrases, we cannot help you recover them. <strong>No key, no decryption.</strong>') !!}
-                </p>
-            </div>
-
-            <div id="content-types" class="scroll-mt-13">
-                <h2 class="text-xl font-semibold mb-3 text-indigo-600 dark:text-indigo-400">{!! __('What kinds of content can I store?') !!}</h2>
-                <p>
-                    {!! __('Currently, Snipto only supports <strong>plain text snippets</strong>. In the future, we may expand support to other types of content while maintaining end-to-end encryption.') !!}
                 </p>
             </div>
 

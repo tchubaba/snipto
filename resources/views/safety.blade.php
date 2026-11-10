@@ -9,7 +9,7 @@
 
             <div>
                 <p>
-                    {!! __('Using Snipto to share text snippets securely is convenient, but there are some simple steps you can follow to make it even safer. These security best practices help protect your snippets and reduce the risk of accidental exposure when creating, viewing, or sharing them. Following these tips ensures that both you and anyone you share with can enjoy a more secure experience.') !!}
+                    {!! __('Using Snipto to share text snippets and files securely is convenient, but there are some simple steps you can follow to make it even safer. These security best practices help protect your snippets and reduce the risk of accidental exposure when creating, viewing, or sharing them. Following these tips ensures that both you and anyone you share with can enjoy a more secure experience.') !!}
                 </p>
             </div>
 
@@ -47,6 +47,13 @@
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Be Extra Careful With Very Sensitive Info') !!}</h2>
                 <p>
                     {!! __('If your snippet contains highly confidential information, consider using offline encrypted files instead of sharing through a website. Browsers can sometimes be exposed to extensions or other risks.') !!}
+                </p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Only Open Files You Were Expecting') !!}</h2>
+                <p>
+                    {!! __('When a Snipto link delivers a file download, first check that you actually expected that file: confirm over a second channel that someone you know really sent it, that the file name looks right, and scan it with your antivirus before opening. Snipto encrypts files in transit and scrubs download names, but it cannot know what a file contains or vouch for it — the contents remain the sender’s responsibility.') !!}
                 </p>
             </div>
 

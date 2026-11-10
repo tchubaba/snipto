@@ -45,7 +45,11 @@ For an **encrypted** snipto, the database row contains (`app/Models/Snipto.php`,
 `ApiController::store()`):
 
 - the **slug** (the locator — treat it as a capability for Plaintext mode, an identifier for encrypted modes)
-- the **ciphertext** envelope: `base64(ciphertext ‖ GCM-tag ‖ HMAC)` — max 10 MB
+- the **ciphertext** envelope: `base64(ciphertext ‖ GCM-tag ‖ HMAC)` — text payloads, max 10 MB
+- **or**, for a file snipto (`kind = file`): the same framing stored as raw bytes in a
+  `LONGBLOB` column (≤ 50 MiB), plus a SHA-256 **upload-token hash** and its 30-minute
+  expiry. The file's name, type, and size are *inside* the ciphertext — they are never sent
+  to the server in any form (`docs/CRYPTO.md` §3.1)
 - the **nonce** (24 hex chars; an IV, not a secret)
 - the **protection type**
 - a **`key_hash`** — a memory-hard authorization token (see `docs/CRYPTO.md` §7); *not* the encryption key, and not reversible to it without paying full Argon2id cost
@@ -60,12 +64,17 @@ timestamp, status, response size, User-Agent, Referer. Note that:
 
 - **URL fragments never reach the server** — the `#k=` key is never in any log, ever.
 - `key_hash` and `reveal_token` travel only in **POST bodies** (`POST /api/snipto/{slug}/reveal`) — never in URLs, where access logs would capture them.
-- The operator can see **ciphertext length** (a weak but real signal — a 20-byte password and a 2 MB log look different), creation/reveal timing, and how many times a slug was probed.
+- The operator can see **ciphertext length** (a weak but real signal — a 20-byte password and a 2 MB log look different), creation/reveal timing, and how many times a slug was probed. For a file, that length is visible twice (reserve row + raw upload body); nothing else about the file is.
 
 Expired rows are deleted by `php artisan sniptos:purge` every 15 minutes (scheduler
 registered in `bootstrap/app.php`), so payloads at rest don't outlive their nominal expiry
 by more than one scheduler interval. Expired-as-not-found responses also avoid leaking that
 a snipto *used* to exist at a slug.
+
+File sniptos add one lifecycle rule: an upload that never landed is **not** a half-visible
+object — the slug 404s on every endpoint until the payload arrives — and abandoned
+reservations are swept by the same purge job 30 minutes after they were made. So a failed
+upload cannot be used to squat slugs or park storage indefinitely.
 
 ---
 
@@ -138,18 +147,37 @@ Double integrity: AES-256-GCM's auth tag **plus** an independent HMAC-SHA256 ove
   this origin — but with no scripts it can never touch the `reveal_token` or payload.
 - COOP/COEP/CORP isolation; CORS disabled outright (`config/cors.php` paths `[]`), so no
   cross-origin API access is possible even from a malicious site.
+- **Files are never rendered at all.** A file reveal is delivered as an opaque blob and the
+  UI offers it only as a download with a hardcoded `application/octet-stream` type — the
+  stored MIME string is recovered from inside the ciphertext for display next to the button
+  and is never echoed into any header, so nothing a sender stored can execute. The filename
+  is aggressively sanitized before it is displayed or used as the download name: path
+  separators and control characters (C0 and C1 ranges) are stripped, Unicode directional
+  overrides that could spoof a visible extension (RTL/LTR overrides, isolates) are removed,
+  and empty/dot-only/reserved names fall back to `download`. `report.pdf.exe`, `..\evil`,
+  and right-to-left-reversed names all arrive inert.
 
 ### T9 — Replay / token theft of the reveal credential
 The `reveal_token` is single-use (burned on **any** attempt, right or wrong), TTL 15 minutes
 (never outliving the snipto), stored only as a SHA-256 hash, and overwritten by each new
 metadata probe. A stolen token is useless after one attempt; a stolen `key_hash` is
 useless without a fresh valid token. Both live only in POST bodies and response bodies,
-never in URLs.
+never in URLs. The file-upload credential follows the same discipline: `store()` hands out a
+one-time 64-hex `upload_token`, the server keeps only its SHA-256 hash with a 30-minute TTL,
+presentation is checked (`hash_equals`) *before* the body is read, and the token is burned
+the moment a payload lands — a second upload under the same token 403s, and a completed row
+404s on the payload route. A re-`POST` that presents the still-valid token keeps it (that is
+what makes same-tab retry work); one that cannot is refused before the existing row is
+touched.
 
 ### T10 — Denial of service / spam creation
-Tiered throttles on all three endpoints (store: 10/min → 5/5min → 12h lockout), payload cap
-10 MB, single forced view per snipto, and the shipped production stack fronts everything
-with a CrowdSec bouncer at the nginx layer.
+Tiered throttles on every snippet endpoint **including the file-upload `PUT`** (store:
+10/min → 5/5min → 12h lockout; a dedicated upload tier with the same escalation shape),
+payload caps (10 MB text / 50 MiB file ciphertext), single forced view per snipto, bounded
+storage pressure because unfinished uploads are invisible *and* reaped after 30 minutes, and
+the shipped production stack fronts everything with a CrowdSec bouncer at the nginx layer —
+where `client_max_body_size 64M`, scoped to the payload route only, rejects oversize bodies
+before PHP or the database ever see them.
 
 ### T11 — Supply-chain compromise of the deployment
 Docker images are signed with **Sigstore/cosign** in CI and base images pinned by digest;
@@ -229,6 +257,15 @@ and was later closed under the audit scheme as `F-3` (`sniptos:purge`). The cryp
 primitives are standard and test-pinned — but no independent third-party audit has been
 performed. If you find a bug, see [SECURITY.md](../SECURITY.md).
 
+### 6.8 Malicious file content
+
+Snipto protects files *in transit*; it does not vouch for what they contain. A file that
+arrives through a Snipto link is only as trustworthy as the sender who uploaded it — E2EE
+proves nobody tampered with it in between, not that it is safe to open. The edges are
+hardened (opaque octet-stream delivery, never rendered, sanitized download names — T8), but
+deciding whether to open a file stays the recipient's job: confirm unexpected files over a
+second channel, scan with antivirus. Self-hosting does not change this either way.
+
 ---
 
 ## 7. Summary table
@@ -248,6 +285,9 @@ performed. If you find a bug, see [SECURITY.md](../SECURITY.md).
 | Endpoint compromise | ❌ out of scope |
 | Metadata / traffic analysis | ❌ out of scope |
 | Plaintext mode | ⚠️ convenience mode — no crypto |
+| File upload abuse / storage pressure | ✅ (50 MiB cap · upload tier · invisible + reaped half-uploads) |
+| Filename spoofing / inline rendering of files | ✅ (sanitized names, opaque octet-stream, never rendered) |
+| Downloaded file content is malicious | ❌ out of scope — trust the sender, scan the download |
 | Formal third-party audit | ⏳ not yet |
 
 *Questions or corrections: open an issue or see [SECURITY.md](../SECURITY.md).*

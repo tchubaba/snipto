@@ -12,7 +12,7 @@
                     <strong>{!! __('Welcome to Snipto!') !!}</strong>
                 </p>
                 <p>
-                    {!! __('Snipto is a free service designed to let you share text snippets securely. We use <strong>end-to-end encryption</strong> to help keep your content private — your data is encrypted in your browser and we never see the plain text.') !!}
+                    {!! __('Snipto is a free service designed to let you share text snippets and files securely. We use <strong>end-to-end encryption</strong> to help keep your content private — your data is encrypted in your browser and we never see the plain text.') !!}
                 </p>
             </div>
 
@@ -47,7 +47,7 @@
             <div>
                 <h2 class="text-xl font-semibold mb-2 text-indigo-600 dark:text-indigo-400">{!! __('Content limitations') !!}</h2>
                 <p>
-                    {!! __('Currently, Snipto only supports <strong>plain text snippets</strong>. Use common sense: do not store illegal content or sensitive information that you wouldn’t want lost.') !!}
+                    {!! __('Snipto supports <strong>text snippets</strong> in every mode, and <strong>files up to 50 MiB</strong> in the three protected modes. Files are encrypted in your browser before upload — the server never sees the file name, type, or contents. Use common sense: do not store illegal content or sensitive information that you wouldn’t want lost.') !!}
                 </p>
             </div>
 

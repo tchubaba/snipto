@@ -68,6 +68,14 @@ jobs:
           cp .env.example .env
           php artisan key:generate --force
 
+      - name: Raise MariaDB max_allowed_packet for the 50 MiB LONGBLOB test
+        # Same story as the e2e job: FileSniptoTest round-trips a real
+        # 50 MiB payload, and the service's 16M-class default kills the
+        # connection on the insert ('server has gone away'). Server vars
+        # cannot ride in the service 'options:' block (see e2e note);
+        # SET GLOBAL here, and every test-process session inherits it.
+        run: php -r 'new PDO("mysql:host=127.0.0.1;port=3306","root","root")->exec("SET GLOBAL max_allowed_packet=134217728");'
+
       - name: Run test suite (MariaDB service — matches production and the local
           docker stack; phpunit.xml's SQLite fallback would neuter lockForUpdate)
         run: php artisan test
@@ -136,6 +144,10 @@ jobs:
           resources/js/snipto.js)
         run: node tests/js/x25519-validation.test.mjs
 
+      - name: File-envelope framing test (build/parse round-trip + rejection
+          paths for the file-sharing envelope in resources/js/snipto.js)
+        run: node tests/js/file-envelope.test.mjs
+
       - run: npm run build
       - run: php artisan migrate --force
 
@@ -146,7 +158,25 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: playwright-${{ runner.os }}-
 
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox
+
+      - name: Raise PHP upload limits for the 50 MiB file e2e specs
+        # Without this, post_max_size=8M (PHP default) makes Laravel's
+        # ValidatePostSize middleware reject big PUT bodies before routing —
+        # the exact failure found in manual testing (deviation D2).
+        # mysql.max_allowed_packet is set explicitly as belt-and-braces;
+        # mysqlnd also honors the server-negotiated size at handshake.
+        run: |
+          SCAN=$(php --ini | awk -F': ' '/Scan for additional/{print $NF}' | tr -d '"')
+          printf 'post_max_size = 128M\nmemory_limit = 384M\nmysql.max_allowed_packet = 134217728\n' | sudo tee "$SCAN/99-e2e-uploads.ini" > /dev/null
+
+      - name: Raise MariaDB max_allowed_packet for the 50 MiB LONGBLOB inserts
+        # MUST be done here, not via the service 'options:' block: the runner
+        # splices options into docker create FLAGS before the image name, so
+        # server variables there fail with 'unknown flag' (exit 125) — the
+        # container never even started. SET GLOBAL after boot, over PDO,
+        # before the app ever connects; new sessions inherit the global.
+        run: php -r 'new PDO("mysql:host=127.0.0.1;port=3306","root","root")->exec("SET GLOBAL max_allowed_packet=134217728");'
 
       - name: Start app
         run: |

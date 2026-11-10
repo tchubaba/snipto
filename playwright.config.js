@@ -12,9 +12,12 @@ import { readFileSync } from 'node:fs';
 //   derivations multiply memory on small runners and make timing flaky.
 // - expect 15s / test 120s — crypto-bound, not network-bound. A derivation is
 //   0.5-2s in headless Chromium; the defaults (5s) flake on shared runners.
-// - chromium only — libsodium WASM + WebCrypto behavior is engine-consistent;
-//   Tor/Mullvad (the privacy browsers that motivated libsodium over WebCrypto
-//   X25519) are a manual matrix, not CI.
+// - chromium + firefox — the Snipto ID mode deliberately avoids WebCrypto
+//   X25519 (blocked by Tor/Mullvad under privacy.resistFingerprinting) in
+//   favor of libsodium WASM; running the whole suite on Gecko pins that the
+//   libsodium/Argon2id/strict-CSP stack works on a second engine family.
+//   Tor/Mullvad themselves remain a manual matrix, not CI. The one genuinely
+//   Chromium-only spec (CDP upload-throttled progress bar) self-skips there.
 function localAppPort() {
     try {
         const match = readFileSync(new URL('.env', import.meta.url), 'utf8')
@@ -41,5 +44,8 @@ export default defineConfig({
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
     },
-    projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+    projects: [
+        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+        { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    ],
 });

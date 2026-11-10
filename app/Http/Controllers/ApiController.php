@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rules\Enum;
@@ -65,6 +66,18 @@ class ApiController extends Controller
                 ], 404);
             }
 
+            // A file-mode row whose blob has not landed yet is invisible to viewers —
+            // same expired-as-absent philosophy. But do NOT delete merely because the
+            // upload is incomplete: the creator's 50 MiB PUT may still be in flight.
+            // Abandoned uploads are reaped by sniptos:purge instead.
+            if ($snipto->isUploadIncomplete()) {
+                return response()->json([
+                    'success' => false,
+                    'exists'  => false,
+                    'message' => 'Snipto not found',
+                ], 404);
+            }
+
             // Mint a fresh one-time reveal token. Only its SHA-256 is stored; the raw
             // token travels in the response body. A new GET overwrites the previous
             // token, so only the most recent probe can ever lead to a reveal.
@@ -77,6 +90,7 @@ class ApiController extends Controller
             $response = [
                 'success'         => true,
                 'exists'          => true,
+                'kind'            => $snipto->kind,
                 'protection_type' => $snipto->getProtectionType()->value,
                 'reveal_token'    => $token,
             ];
@@ -92,6 +106,11 @@ class ApiController extends Controller
                 $response['sender_public_key'] = $snipto->sender_public_key;
                 $response['key_provider_type'] = $snipto->key_provider_type;
                 $response['recipient_salt']    = $snipto->recipient_salt;
+                // File-mode reveals answer with a bare binary body that carries
+                // no JSON envelope, so the mode-3 client must learn the nonce
+                // here instead. It is an IV, public by the same reasoning as
+                // the salt and sender pubkey above.
+                $response['nonce']             = $snipto->nonce;
             }
 
             // Password mode derives key_hash from Argon2id(password, ...nonce-derived salt...).
@@ -121,10 +140,12 @@ class ApiController extends Controller
      * which re-enters the show-snipto throttle tiers.
      *
      * @param  string  $slug  The unique identifier for retrieving the Snipto resource.
-     * @return JsonResponse The payload on success; 403 for an invalid/expired/consumed
-     *                      token or key_hash; 404 when the snipto does not exist.
+     * @return Response|JsonResponse The payload on success — JSON for text mode, raw
+     *                               octet-stream for file mode; 403 for an
+     *                               invalid/expired/consumed token or key_hash; 404
+     *                               when the snipto does not exist.
      */
-    public function reveal(string $slug, Request $request): JsonResponse
+    public function reveal(string $slug, Request $request): Response|JsonResponse
     {
         return DB::transaction(function () use ($slug, $request) {
             $snipto = Snipto::where('slug', $slug)->lockForUpdate()->first();
@@ -139,6 +160,15 @@ class ApiController extends Controller
             }
 
             $token   = $request->string('reveal_token')->toString();
+
+            // Incomplete file uploads are invisible here too (see show()): 404,
+            // and NO delete — the creator's PUT may still be in flight.
+            if ($snipto->isUploadIncomplete()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Snipto not found',
+                ], 404);
+            }
             $tokenOk = $snipto->reveal_token_hash !== null
                 && $snipto->reveal_token_expires_at !== null
                 && $snipto->reveal_token_expires_at->isFuture()
@@ -163,12 +193,27 @@ class ApiController extends Controller
             // migration) is treated fail-closed — delete, never "unlimited".
             if ($tokenOk && $keyHashOk) {
                 if ((int) $snipto->views_remaining <= 1) {
+                    $payload = $snipto->payload;
+                    $blob    = $snipto->payload_blob;
+                    $isFile  = $snipto->isFile();
                     $snipto->delete();
+
+                    if ($isFile) {
+                        // File mode: the body IS the opaque ciphertext — served raw,
+                        // never inspected, never base64'd. Errors stay JSON; the
+                        // client branches on Content-Type.
+                        return response((string) $blob, 200, [
+                            'Content-Type'        => 'application/octet-stream',
+                            'Content-Disposition' => 'attachment; filename="snipto"',
+                            'X-Accel-Buffering'   => 'no',
+                            'Cache-Control'       => 'no-store',
+                        ]);
+                    }
 
                     return response()->json([
                         'success'         => true,
                         'protection_type' => $snipto->protection_type->value,
-                        'payload'         => $snipto->payload,
+                        'payload'         => $payload,
                         'nonce'           => $snipto->nonce,
                         'views_remaining' => 0,
                     ]);
@@ -181,6 +226,15 @@ class ApiController extends Controller
                 $snipto->reveal_token_hash       = null;
                 $snipto->reveal_token_expires_at = null;
                 $snipto->save();
+
+                if ($snipto->isFile()) {
+                    return response((string) $snipto->payload_blob, 200, [
+                        'Content-Type'        => 'application/octet-stream',
+                        'Content-Disposition' => 'attachment; filename="snipto"',
+                        'X-Accel-Buffering'   => 'no',
+                        'Cache-Control'       => 'no-store',
+                    ]);
+                }
 
                 return response()->json([
                     'success'         => true,
@@ -228,6 +282,14 @@ class ApiController extends Controller
     {
         $protectionType = ProtectionType::tryFrom((int) $request->input('protection_type'));
 
+        $isFile = $request->input('kind') === 'file';
+
+        // File mode is encrypted-only: for Plaintext the slug is the ONLY secret,
+        // and pointing it at a large high-value target is a downgrade we refuse.
+        if ($isFile && $protectionType === ProtectionType::Plaintext) {
+            return response()->json(['success' => false], 422);
+        }
+
         $rules = [
             // The charset rule must stay in lockstep with the slug route regex in
             // routes/web.php ([A-Za-z0-9_-]+): a slug that passes validation but fails
@@ -237,18 +299,33 @@ class ApiController extends Controller
             // for encrypted modes the slug is just an identifier. Reserved slugs are
             // shadowed by static routes and would be unreachable from birth.
             'slug' => [
-                'required', 'string', 'max:100', 'unique:sniptos,slug',
+                // 'unique:sniptos,slug' is added below for text mode only. File
+                // mode handles existence itself: an INCOMPLETE file row (store
+                // succeeded, PUT never landed — creator hit a network drop or a
+                // size cliff) must be replaceable by a re-store of the same
+                // slug, otherwise the creator is dead-ended: the row is
+                // invisible (404), there is no DELETE endpoint, and the slug
+                // stays locked behind 422 until purge. Completed rows and text
+                // rows keep the hard 422 — nobody can clobber a landed payload.
+                'required', 'string', 'max:100',
                 'regex:/^[A-Za-z0-9_-]+$/',
                 $protectionType === ProtectionType::Plaintext ? 'min:8' : 'min:4',
                 'not_in:' . implode(',', self::RESERVED_SLUGS),
             ],
+            'kind'            => ['nullable', 'in:text,file'],
             'protection_type' => ['required', new Enum(ProtectionType::class)],
             'views_remaining' => 'nullable|integer|min:1|max:200',
             'expiration'      => 'nullable|string|in:1h,1d,1w',
         ];
 
+        if ( ! $isFile) {
+            $rules['slug'][] = 'unique:sniptos,slug';
+        }
+
         if ($protectionType && $protectionType !== ProtectionType::Plaintext) {
-            $rules['payload'] = [
+            // Binary transport: the payload arrives later via
+            // PUT /api/snipto/{slug}/payload and is validated there by body size.
+            $rules['payload'] = $isFile ? 'nullable|string|max:0' : [
                 'required',
                 'string',
                 'min:4',
@@ -257,6 +334,10 @@ class ApiController extends Controller
             ];
             $rules['key_hash'] = 'required|string|size:64|regex:/^[0-9a-fA-F]+$/';
             $rules['nonce']    = 'required|string|size:24|regex:/^[0-9a-fA-F]+$/';
+
+            if ($isFile) {
+                $rules['upload_token'] = 'nullable|string|size:64|regex:/^[0-9a-fA-F]+$/';
+            }
 
             if ($protectionType === ProtectionType::SniptoId) {
                 $rules['sender_public_key'] = ['required', 'string', 'size:44', 'regex:/^[A-Za-z0-9+\/]{43}=$/'];
@@ -294,13 +375,74 @@ class ApiController extends Controller
         }
 
         $validated               = $validator->validated();
+        $priorUploadToken        = (string) ($validated['upload_token'] ?? $request->header('X-Upload-Token', ''));
+        unset($validated['upload_token']);
         $validated['expires_at'] = $expiresAt;
+        $validated['kind']       = $isFile ? 'file' : 'text';
 
         // Forcing all sniptos to have only one view for now.
         $validated['views_remaining'] = 1;
 
+        if ($isFile) {
+            // One-time upload token, same hardening lineage as reveal_token
+            // (pentest F-001): only its SHA-256 is stored, it travels in a header
+            // (never a URL), and it is consumed once the creator's upload attempt
+            // authenticates.
+            $uploadToken                          = bin2hex(random_bytes(32));
+            $validated['payload']                 = null;
+            $validated['upload_token_hash']       = hash('sha256', $uploadToken);
+            $validated['upload_token_expires_at'] = now()->addMinutes(30);
+        }
+
         try {
-            $snipto = Snipto::create($validated);
+            $snipto = DB::transaction(function () use ($isFile, $validated, $priorUploadToken): ?Snipto {
+                if ($isFile) {
+                    // Reset-or-create inside an explicit transaction so lockForUpdate()
+                    // holds the InnoDB row lock across the check and write.
+                    // If the incomplete row still has a live, unburned upload token
+                    // (creator's PUT is in flight or dropped before reaching PHP),
+                    // replacing it requires presenting that token so a third party
+                    // cannot hijack an in-flight upload. Once a PUT has burned or
+                    // expired the token without landing a blob, the row can be reset
+                    // directly. Completed rows and text rows stay hard 422.
+                    $existing = Snipto::where('slug', $validated['slug'])->lockForUpdate()->first();
+
+                    if ($existing) {
+                        if ($existing->isExpired()) {
+                            $existing->delete();
+                        } elseif ($existing->isFile() && $existing->isUploadIncomplete()) {
+                            $hasActiveToken = $existing->upload_token_hash !== null
+                                && $existing->upload_token_expires_at !== null
+                                && $existing->upload_token_expires_at->isFuture();
+
+                            $tokenMatches = $priorUploadToken !== ''
+                                && $existing->upload_token_hash !== null
+                                && hash_equals($existing->upload_token_hash, hash('sha256', $priorUploadToken));
+
+                            if ($hasActiveToken && ! $tokenMatches) {
+                                return null;
+                            }
+
+                            $existing->fill($validated);
+                            $existing->payload_blob            = null;
+                            $existing->reveal_token_hash       = null;
+                            $existing->reveal_token_expires_at = null;
+                            $existing->created_at              = now();
+                            $existing->save();
+
+                            return $existing;
+                        } else {
+                            return null;
+                        }
+                    }
+                }
+
+                return Snipto::create($validated);
+            });
+
+            if ($snipto === null) {
+                return response()->json(['success' => false], 422);
+            }
         } catch (QueryException $t) {
             // Lost the unique-slug race between validation and insert (pentest AUTHZ-008):
             // SQLSTATE 23000 covers MariaDB's 1062 and SQLite's "UNIQUE constraint failed".
@@ -334,9 +476,113 @@ class ApiController extends Controller
             ], 500);
         }
 
-        return response()->json([
+        $response = [
             'success' => true,
             'slug'    => $snipto->slug,
-        ]);
+        ];
+
+        // The key is added only for file mode so the existing text-mode API
+        // contract stays byte-identical.
+        if ($isFile) {
+            $response['upload_token'] = $uploadToken;
+        }
+
+        return response()->json($response);
+    }
+
+    /**
+     * Accepts the encrypted binary payload for a file-mode Snipto. The ONLY
+     * endpoint that writes payload_blob. The row created by store() is invisible
+     * to viewers until this lands (see show()/reveal()), and a completed upload
+     * can never be overwritten. The body is raw ciphertext bytes — opaque,
+     * never inspected, never logged.
+     */
+    public function upload(string $slug, Request $request): JsonResponse
+    {
+        return DB::transaction(function () use ($slug, $request) {
+            $snipto = Snipto::where('slug', $slug)->lockForUpdate()->first();
+
+            if ( ! $snipto || $snipto->isExpired()) {
+                $snipto?->delete();
+
+                return response()->json(['success' => false, 'message' => 'Snipto not found'], 404);
+            }
+
+            // A text-mode snipto is never an upload target — answer 404 without
+            // deleting the live text row.
+            if ( ! $snipto->isFile()) {
+                return response()->json(['success' => false, 'message' => 'Snipto not found'], 404);
+            }
+
+            $token   = (string) $request->header('X-Upload-Token', '');
+            $tokenOk = $token !== ''
+                && $snipto->upload_token_hash !== null
+                && $snipto->upload_token_expires_at !== null
+                && $snipto->upload_token_expires_at->isFuture()
+                && hash_equals($snipto->upload_token_hash, hash('sha256', $token));
+
+            // Verify the 256-bit upload token BEFORE burning it so an
+            // unauthenticated probe cannot sabotage an in-flight upload.
+            if ( ! $tokenOk || $snipto->payload_blob !== null) {
+                return response()->json(['success' => false, 'message' => 'Upload token invalid or expired.'], 403);
+            }
+
+            // Authenticated attempt consumes the one-time upload token.
+            $this->burnUploadToken($snipto);
+
+            $maxBody = (int) config('snipto.max_file_bytes')
+                + (int) config('snipto.envelope_slack_bytes');
+
+            // Fast path: a lying/absent Content-Length is caught by the capped read.
+            if ((int) $request->header('Content-Length', '-1') > $maxBody) {
+                return response()->json(['success' => false, 'message' => 'Payload too large.'], 413);
+            }
+
+            $body = $this->readBodyCapped($request, $maxBody);
+            if ($body === null || $body === '') {
+                return response()->json(['success' => false, 'message' => 'Payload too large or empty.'], 413);
+            }
+
+            $snipto->payload_blob = $body;
+            $snipto->save();
+
+            return response()->json(['success' => true, 'slug' => $snipto->slug]);
+        });
+    }
+
+    private function burnUploadToken(Snipto $snipto): void
+    {
+        $snipto->upload_token_hash       = null;
+        $snipto->upload_token_expires_at = null;
+        $snipto->save();
+    }
+
+    /**
+     * Reads the request body as a stream so a client that lies about
+     * Content-Length still cannot make us allocate beyond the cap.
+     */
+    private function readBodyCapped(Request $request, int $cap): ?string
+    {
+        $fh   = $request->getContent(true); // resource handle on php://input
+        $body = '';
+
+        try {
+            while ( ! feof($fh)) {
+                $chunk = fread($fh, 65536);
+                if ($chunk === false) {
+                    return null;
+                }
+                $body .= $chunk;
+                if (strlen($body) > $cap) {
+                    return null;
+                }
+            }
+        } finally {
+            if (is_resource($fh)) {
+                fclose($fh);
+            }
+        }
+
+        return $body;
     }
 }

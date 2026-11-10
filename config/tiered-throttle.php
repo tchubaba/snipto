@@ -167,6 +167,21 @@ return [
             'offense_ttl'     => 7200, // 2 hours
         ],
 
+        /*
+         | upload-snipto
+         | Applied to: PUT /api/snipto/{slug}/payload
+         | Each attempt carries a large body, so this tier set is stricter than
+         | store-snipto by design: 50 MiB x 5/2min is already the practical DoS ceiling.
+         */
+        'upload-snipto' => [
+            'tiers' => [
+                [5, 120], // Tier 0: 5 uploads per 2 minutes  (baseline)
+                [2, 600], // Tier 1: 2 uploads per 10 minutes (first offense)
+            ],
+            'lockout_seconds' => 43200, // 12 hours
+            'offense_ttl'     => 7200,  // 2 hours
+        ],
+
     ],
 
 ];
