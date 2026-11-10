@@ -30,6 +30,9 @@ Route::prefix('api/snipto')->group(function () {
     Route::post('{slug}/reveal', [ApiController::class, 'reveal'])
         ->where('slug', '[A-Za-z0-9_-]+')
         ->middleware('tiered.throttle:reveal-snipto');
+    Route::put('{slug}/payload', [ApiController::class, 'upload'])
+        ->where('slug', '[A-Za-z0-9_-]+')
+        ->middleware('tiered.throttle:upload-snipto');
 });
 
 Route::post('/locale', function (Request $request) {

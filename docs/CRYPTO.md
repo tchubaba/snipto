@@ -66,6 +66,37 @@ Every stored payload is `base64( ciphertext ‖ GCM-tag(16) ‖ HMAC-SHA256(32) 
 The nonce doubles as the per-snipto KDF salt input (see below), which is why the server
 returns it in the pre-auth metadata response: it's an IV/salt, not a secret.
 
+### 3.1 File payloads (`kind = file`): inner envelope + binary transport
+
+Text payloads travel as JSON strings. A file payload instead *reserves* the row with a
+metadata-only `POST /api/snipto` (`kind: "file"` — the server receives **no filename, no
+MIME type, no declared size**) and then *lands* the ciphertext with
+`PUT /api/snipto/{slug}/payload`: a raw `application/octet-stream` body authorized by the
+one-time `X-Upload-Token` handed out by the reserve call. No base64 anywhere on the file
+path — the bytes go up exactly as they come down (that is what makes 50 MiB feasible;
+base64 would inflate the wire by a third and the storage column by the same).
+
+Before encryption, the browser wraps the file in an **inner envelope**:
+
+```
+plaintext = [u16 BE headerLen][header JSON {"n": name, "m": MIME, "s": byteLength}][file bytes]
+```
+
+The header lives *inside* the ciphertext, so name and type never appear in any server-visible
+place (`store()` has nothing to validate them against because they were never sent). The
+encrypted output — the same `ciphertext ‖ GCM-tag ‖ HMAC` framing as above — is stored
+verbatim in a `LONGBLOB` column (`payload_blob`), never base64'd. Retrieval is symmetric:
+`reveal` returns the bytes as `application/octet-stream`; the browser decrypts, parses the
+envelope, and offers a download. The HTTP `Content-Type` is a hardcoded
+`application/octet-stream` on both legs — the sender's MIME string is untrusted display
+metadata recovered from inside the ciphertext, never echoed into a response header — so a
+stored `text/html` payload can never render anywhere.
+
+Files are encrypted-only: `kind: "file"` with `protection_type: 0` is a 422 at creation.
+An unencrypted file upload has no crypto to retroactively protect, and the UI hides the
+mode for files accordingly. See [THREAT_MODEL.md](THREAT_MODEL.md) T8/T10 and §6.8 for the
+file-specific threat treatments.
+
 ---
 
 ## 4. Mode 1 — URL Secret (default)
@@ -195,23 +226,38 @@ No crypto at all: the payload is stored as-is and the slug is the only access co
 which is why the server enforces slug ≥ 8 chars for this mode (a 3-word diceware slug is
 ~31–38 bits) and the UI warns loudly. Included for non-sensitive convenience sharing
 (e.g. a long URL to text somewhere). It is not a security mode and the threat model says so.
+Files cannot use it: `kind: "file"` + `protection_type: 0` is rejected 422 before anything
+is asked to upload — there would be no crypto to retroactively protect the bytes.
 
 ## 10. Protocol summary (wire view)
 
 ```
-Create:   POST /api/snipto
+Text create:  POST /api/snipto
             { slug, protection_type, payload(b64 envelope), nonce(24 hex),
               key_hash(64 hex), [sender_public_key, recipient_salt, key_provider_type] }
-Probe:    GET  /api/snipto/{slug}
-            → { protection_type, reveal_token, nonce | bootstrap fields }   # never the payload
-Reveal:   POST /api/snipto/{slug}/reveal
+File reserve: POST /api/snipto
+            { kind:"file", slug, protection_type(1|2|3), nonce, key_hash,
+              [type-3 bootstrap fields] } → { ..., upload_token }   # ≤50 MiB; no name/mime/size
+File upload:  PUT /api/snipto/{slug}/payload   + header X-Upload-Token
+            raw application/octet-stream body → row becomes visible (403 bad token · 413 oversize)
+Probe:        GET  /api/snipto/{slug}
+            → { kind, protection_type, reveal_token, nonce | bootstrap fields }  # never the payload
+Reveal:       POST /api/snipto/{slug}/reveal
             { reveal_token, key_hash } → payload (once) | 403 | 404
+            text → JSON with base64 envelope · file → raw application/octet-stream
 ```
 
 - Slugs: `[A-Za-z0-9_-]+`, ≥8 (Plaintext) / ≥4 (encrypted), reserved-slug denylist.
-- Payload cap: 10 MB. Views: forced to 1 (single-use). Expiry: 1 h default; 1 h/1 d/1 w for
-  Password and Snipto ID modes. Expired rows purged every 15 min.
-- All three endpoints tiered-throttled per real client IP.
+- Payload caps: 10 MB text; 50 MiB file ciphertext (binary `LONGBLOB` transport;
+  `max_allowed_packet` 128 MB, nginx `client_max_body_size 64M` scoped to the payload
+  route, `post_max_size` 128 MB).
+- Incomplete file rows are invisible (404 on every endpoint) and reaped 30 min after the
+  reserve; the `upload_token` is stored only as a SHA-256 hash with a 30-min TTL and is
+  burned once the payload lands (a completed row 404s on the payload route, a used token
+  403s).
+- Views: forced to 1 (single-use; a file means exactly one download). Expiry: 1 h default;
+  1 h/1 d/1 w for Password and Snipto ID modes. Expired rows purged every 15 min.
+- Every snippet endpoint — including the file `PUT` — tiered-throttled per real client IP.
 
 ## 11. Threat-model cross-references
 

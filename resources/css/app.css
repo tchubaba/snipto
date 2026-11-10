@@ -276,9 +276,13 @@
  * "everything else" is small enough to leave the editor a usable height, and
  * the Password and Snipto ID modes carry an expiry picker, an extra field and
  * a warning box on top of the mode switcher — around 150px more than the
- * default mode. So below this window height we drop the decorative copy,
- * tighten the rhythm and let the editor shrink a little further, which keeps
- * the form fully visible down to roughly half a 1440p screen.
+ * default mode. So below this window height we tighten the rhythm and let the
+ * editor shrink a little further, which keeps the form fully visible down to
+ * roughly a 1080p browser viewport. (An earlier revision also hid "decorative"
+ * copy — the "Got something to share?" header, the mode-3 double-check box,
+ * the safety-tips link — but users want all three always visible, so nothing
+ * is hidden anymore; below the floor the form just scrolls like it does on
+ * narrow screens.)
  *
  * The min-width guard matters: a phone is short as well as narrow, and a
  * 390x844 viewport would otherwise lose its heading and its safety link.
@@ -296,10 +300,6 @@
 
     .create-form > * + * {
         margin-top: 0.5rem;
-    }
-
-    .hide-when-short {
-        display: none;
     }
 }
 

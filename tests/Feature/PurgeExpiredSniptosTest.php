@@ -84,4 +84,72 @@ class PurgeExpiredSniptosTest extends TestCase
         $this->assertDatabaseHas('sniptos', ['slug' => 'live-row']);
         $this->assertDatabaseHas('sniptos', ['slug' => 'fresh-row']);
     }
+
+    #[Test]
+    public function purge_reaps_abandoned_file_uploads_but_not_in_flight_ones(): void
+    {
+        // A file-mode row whose PUT never landed can never complete once its
+        // upload token dies (30 min) — reap it instead of squatting until the
+        // full expiration window.
+        $abandoned = Snipto::create([
+            'slug'                    => 'abandoned-upload',
+            'kind'                    => 'file',
+            'payload'                 => null,
+            'protection_type'         => ProtectionType::Secret,
+            'expires_at'              => Carbon::now()->addHour(),
+            'upload_token_expires_at' => Carbon::now()->subMinute(),
+            'views_remaining'         => 1,
+        ]);
+        $abandoned->created_at = Carbon::now()->subMinutes(31);
+        $abandoned->save();
+
+        // A reset row whose original created_at was > 30 min ago but whose
+        // upload_token_expires_at is still in the future must NOT be reaped
+        // while the retried upload is in flight.
+        $resetInFlight = Snipto::create([
+            'slug'                    => 'reset-in-flight',
+            'kind'                    => 'file',
+            'payload'                 => null,
+            'protection_type'         => ProtectionType::Secret,
+            'expires_at'              => Carbon::now()->addHour(),
+            'upload_token_expires_at' => Carbon::now()->addMinutes(20),
+            'views_remaining'         => 1,
+        ]);
+        $resetInFlight->created_at = Carbon::now()->subMinutes(40);
+        $resetInFlight->save();
+
+        // An in-flight upload (created after the TTL window opened) must keep
+        // its row — the creator's 50 MiB PUT may still be landing.
+        $inFlight = Snipto::create([
+            'slug'                    => 'in-flight-upload',
+            'kind'                    => 'file',
+            'payload'                 => null,
+            'protection_type'         => ProtectionType::Secret,
+            'expires_at'              => Carbon::now()->addHour(),
+            'upload_token_expires_at' => Carbon::now()->addMinutes(20),
+            'views_remaining'         => 1,
+        ]);
+        $inFlight->created_at = Carbon::now()->subMinutes(10);
+        $inFlight->save();
+
+        // A completed file row well inside its window stays untouched.
+        $completed = Snipto::create([
+            'slug'            => 'completed-file',
+            'kind'            => 'file',
+            'payload'         => null,
+            'payload_blob'    => 'opaque-ciphertext',
+            'protection_type' => ProtectionType::Secret,
+            'expires_at'      => Carbon::now()->addDay(),
+            'views_remaining' => 1,
+        ]);
+
+        $this->artisan('sniptos:purge')
+            ->expectsOutputToContain('Purged 1 expired snipto(s).')
+            ->assertExitCode(0);
+
+        $this->assertDatabaseMissing('sniptos', ['slug' => 'abandoned-upload']);
+        $this->assertDatabaseHas('sniptos', ['slug' => 'reset-in-flight']);
+        $this->assertDatabaseHas('sniptos', ['slug' => 'in-flight-upload']);
+        $this->assertDatabaseHas('sniptos', ['slug' => 'completed-file']);
+    }
 }

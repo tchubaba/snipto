@@ -58,6 +58,9 @@ services:
   mariadb:
     restart: unless-stopped
     image: 'mariadb:11@sha256:2439dcd7d14010ecd1ff7a4e1c5abe8e208c34fe35290744deeeaac3569043c3'
+    # File-mode payloads arrive as single LONGBLOB rows up to 50 MiB; the
+    # 16 MiB default max_allowed_packet cannot carry them.
+    command: --max-allowed-packet=134217728
     profiles: ["with-db"]
     ports:
       # Secured: Bound strictly to host localhost. Public internet blocked.

@@ -33,6 +33,7 @@ Snipto is designed with a **zero-knowledge, end-to-end encrypted** model by defa
 *   **Server Never Sees Keys:** For Secret, Password, and Snipto ID modes, the server never receives the user's passphrase, password, or private keys.
 *   **Encryption is Client-Side:** All cryptographic operations (Argon2id key derivation, AES-256-GCM encryption, X25519 ECDH) are performed in the user's browser using WebAssembly (libsodium) or the WebCrypto API.
 *   **Payloads are Ciphertext:** In the encrypted modes, the server only stores encrypted payloads. Without the client-side key, the data is mathematically inaccessible. (The Plaintext mode is an explicit user opt-out of E2EE and stores the snippet as-is; the UI warns clearly when it is active.)
+*   **Files Ride the Same Envelope:** File sharing (up to 50 MiB, protected modes only) encrypts the file's **name, type, and contents** into a single client-side envelope before upload; the server stores one opaque binary blob and never sees any of the three. Downloads are offered as opaque `application/octet-stream` — never rendered, never trusting the sender's MIME string — and each link is good for exactly one download.
 
 ### Cryptographic Standards
 
@@ -62,6 +63,7 @@ Snipto enforces a strict CSP to prevent XSS and other client-side attacks:
 
 *   **Client-Side Trust:** Users must trust the Snipto client-side code. We encourage auditing the source code and verifying the Docker Hub image build process.
 *   **Passphrase Strength:** Security is only as strong as the user's passphrase. We enforce minimum lengths (12 chars for Password mode, 20 chars for Snipto ID) and recommend strong, memorable passphrases.
+*   **File Contents Are Not Vouched For:** Snipto encrypts files in transit but cannot inspect what a file contains and does not antivirus-scan anything. Recipients should confirm unexpected files with the sender over a second channel and scan downloads locally before opening.
 *   **Browser Extensions:** As a browser-based E2EE solution, Snipto can be vulnerable to malicious browser extensions that intercept data before encryption or after decryption. We mitigate this by educating users on best practices in our [Safety Guide](/safety), including recommending the use of a dedicated, clean browser profile for sensitive snippets.
 *   **URL Secret Mode Key Exposure:** In Random URL Secret mode, the encryption key is embedded in the URL fragment (`#k=...`), meaning anyone with the full URL can read the snippet. We mitigate this through the **ephemerality** of the snippet and a **1-hour expiration limit**. Furthermore, all Snipto modes are **automatically deleted from the server immediately upon retrieval**, limiting the window of opportunity for unauthorized access. Snippets that are never retrieved are purged from the database by a scheduled job (every 15 minutes in the shipped Docker images), so at-rest data does not outlive its nominal expiry by more than one scheduler interval. For higher security, we recommend **Snipto ID mode**, which uses **asymmetric encryption** to eliminate the need to share a secret or password along with the URL.
 

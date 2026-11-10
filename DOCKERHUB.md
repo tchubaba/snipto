@@ -2,10 +2,11 @@
 
 **Secure, ephemeral, end-to-end encrypted snippet sharing.**
 
-Snipto lets you share text snippets via single-use URLs. Content is encrypted in the browser before it ever leaves the device — the server stores ciphertext only and has no way to read it. Snippets self-destruct after the first view (or after their expiration window).
+Snipto lets you share text snippets and files (up to 50 MiB) via single-use URLs. Content is encrypted in the browser before it ever leaves the device — the server stores ciphertext only and has no way to read it. Snippets self-destruct after the first view or download (or after their expiration window).
 
 - End-to-end encrypted (AES-256-GCM client-side; key never touches the server)
 - Three protection modes: random link-key, password, or asymmetric **Snipto ID** (X25519 ECDH)
+- File sharing up to 50 MiB — same E2EE envelope (name, type, and contents encrypted in your browser; the server stores opaque ciphertext only), protected modes only, single download, uploads not resumable
 - Memory-hard key derivation (Argon2id) for password and Snipto ID modes
 - Built-in diceware passphrase generator with reveal/copy gate
 - Single-use, auto-expiring (1 hour default; up to 1 week for password / Snipto ID)
@@ -70,6 +71,8 @@ docker run -d \
   tchubaba/snipto:latest
 ```
 
+> **Note:** with file sharing enabled, an external MariaDB/MySQL must be configured with `max_allowed_packet >= 128M` — file payloads are stored as single rows up to 50 MiB, which exceeds the 16 MiB server default.
+
 ### Persistence
 
 For SQLite, mount a volume at the path you point `DB_DATABASE` to (as in the quick-start example). For external databases, persistence lives on the database server — no volume needed.
@@ -84,9 +87,19 @@ Then tell Snipto to believe that proxy for the client address:
   -e TRUSTED_PROXIES=172.18.0.2   # the proxy's address as the app container sees it
 ```
 
-Caddy and Traefik send `X-Forwarded-For` on their own. nginx needs it spelled out:
+Caddy and Traefik send `X-Forwarded-For` on their own. nginx needs it spelled out (and `client_max_body_size` raised on the upload route for 50 MiB file sharing):
 
 ```nginx
+# Raise the body cap only on the upload route (PUT /api/snipto/{slug}/payload);
+# every other route keeps nginx's default.
+location ~ ^/api/snipto/[A-Za-z0-9_-]+/payload$ {
+    client_max_body_size 64m;
+    client_body_timeout 120s;
+    proxy_pass http://snipto:8080;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
 location / {
     proxy_pass http://snipto:8080;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -102,18 +115,10 @@ location / {
 
 If you publish `8080` yourself, **leave `TRUSTED_PROXIES` unset.** The client's TCP connection terminates at the container, so `REMOTE_ADDR` is already the real client address and the rate limiter keys on it correctly; a forged `X-Forwarded-For` is simply ignored. Setting the variable in this topology is what would make header spoofing possible.
 
-Three things to know before running this way:
+Two things to know before running this way:
 
 - **No TLS.** The container runs PHP's built-in server, which cannot terminate TLS. Snippet content is encrypted in the browser before it leaves it, but that guarantee depends on the browser running untampered JavaScript — over plain HTTP an on-path attacker can rewrite the page and capture a passphrase or password *before* encryption happens. Plain HTTP is for LAN use and testing; anything routable should sit behind a TLS-terminating proxy.
-- **One request at a time.** `PHP_CLI_SERVER_WORKERS` is not set, so the built-in server serialises requests.
-- **8 MB request cap.** PHP's default `post_max_size` is `8M` while the API itself allows 10 MB, so uploads between 8 and 10 MB are rejected with `413`. A `PHP_POST_MAX_SIZE` environment variable does not fix it — `post_max_size` is a per-directory setting, so mount an ini file instead:
-
-  ```bash
-  # uploads.ini contains:  post_max_size=12M
-  docker run -d ... -v ./uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro ...
-  ```
-
-  Or front the container with a proxy that buffers the body.
+- **One request at a time.** `PHP_CLI_SERVER_WORKERS` is not set, so the built-in server serialises requests (including 50 MiB file uploads and downloads). The image sets `post_max_size = 128M` and `memory_limit = 384M` out of the box so 50 MiB encrypted file payloads work without extra PHP ini mounts.
 
 ---
 

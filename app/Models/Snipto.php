@@ -13,7 +13,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * @property int $id
  * @property string $slug
- * @property string $payload
+ * @property string $kind
+ * @property string|null $payload
+ * @property string|null $payload_blob
  * @property string|null $key_hash
  * @property string|null $nonce
  * @property string|null $sender_public_key
@@ -22,6 +24,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $views_remaining
  * @property string|null $reveal_token_hash
  * @property Carbon|null $reveal_token_expires_at
+ * @property string|null $upload_token_hash
+ * @property Carbon|null $upload_token_expires_at
  * @property ProtectionType $protection_type
  * @property Carbon $expires_at
  * @property Carbon|null $created_at
@@ -47,7 +51,9 @@ class Snipto extends Model
 
     protected $fillable = [
         'slug',
+        'kind',
         'payload',
+        'payload_blob',
         'key_hash',
         'nonce',
         'sender_public_key',
@@ -56,13 +62,17 @@ class Snipto extends Model
         'views_remaining',
         'reveal_token_hash',
         'reveal_token_expires_at',
+        'upload_token_hash',
+        'upload_token_expires_at',
         'protection_type',
         'expires_at',
     ];
 
     protected $casts = [
         'slug'                    => 'string',
+        'kind'                    => 'string',
         'payload'                 => 'string',
+        'payload_blob'            => 'string',
         'key_hash'                => 'string',
         'nonce'                   => 'string',
         'sender_public_key'       => 'string',
@@ -71,6 +81,8 @@ class Snipto extends Model
         'views_remaining'         => 'integer',
         'reveal_token_hash'       => 'string',
         'reveal_token_expires_at' => 'datetime',
+        'upload_token_hash'       => 'string',
+        'upload_token_expires_at' => 'datetime',
         'protection_type'         => ProtectionType::class,
         'expires_at'              => 'datetime',
     ];
@@ -137,5 +149,23 @@ class Snipto extends Model
     public function isSniptoId(): bool
     {
         return $this->protection_type === ProtectionType::SniptoId;
+    }
+
+    /**
+     * Indicates whether this Snipto carries a file payload (binary transport)
+     * rather than a text payload.
+     */
+    public function isFile(): bool
+    {
+        return $this->kind === 'file';
+    }
+
+    /**
+     * A file-mode snipto whose blob has not landed yet (upload never finished or
+     * never started). It must be invisible to viewers — see show()/reveal().
+     */
+    public function isUploadIncomplete(): bool
+    {
+        return $this->isFile() && $this->payload_blob === null;
     }
 }

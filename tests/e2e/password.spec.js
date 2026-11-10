@@ -174,3 +174,34 @@ test('password: "1 Week" expiration selection is accepted end-to-end', async ({ 
 
     await expect(page.getByTestId('success-url-input')).toBeVisible({ timeout: 30_000 });
 });
+
+// "Snipto it" readiness (snipto.js submitReady getter): the button is only
+// enabled when the CURRENT mode's requirements are met. Pins the text-mode
+// matrix: empty form inert; text alone is enough in secret mode (its key is
+// generated at submit time); switching to password mode re-inerts the button
+// until the 12-char length floor is met. Strength is deliberately NOT part of
+// readiness - a 12-char weak password enables the button and defers to the
+// weak-password modal flow pinned above.
+test('password: submit button is disabled until the mode requirements are met', async ({ page }) => {
+    await page.goto(`/${uniqueSlug('ready')}`);
+
+    // Default mode 1 (random secret): empty textarea keeps the button inert.
+    await expect(page.getByTestId('create-submit')).toBeDisabled();
+
+    await page.getByTestId('content-textarea').fill(uniqueSentinel('READY'));
+    await expect(page.getByTestId('create-submit')).toBeEnabled();
+
+    // Switching to password mode re-gates on the password field.
+    await page.getByTestId('mode-btn-2').click();
+    await expect(page.getByTestId('create-submit')).toBeDisabled();
+
+    await page.getByTestId('create-password-input').fill('twelve12345'); // 11 chars
+    await expect(page.getByTestId('create-submit')).toBeDisabled();
+
+    await page.getByTestId('create-password-input').fill('twelve123456'); // 12 -> ready
+    await expect(page.getByTestId('create-submit')).toBeEnabled();
+
+    // Whitespace-only text never readies the form.
+    await page.getByTestId('content-textarea').fill('   \n  ');
+    await expect(page.getByTestId('create-submit')).toBeDisabled();
+});

@@ -58,6 +58,18 @@
                 ':count lines' => __(':count lines'),
                 'E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.' => __('E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.'),
                 'Heads up: this Snipto was addressed to a different Snipto ID than the one saved in this browser. Make sure you were given the right one.' => __('Heads up: this Snipto was addressed to a different Snipto ID than the one saved in this browser. Make sure you were given the right one.'),
+                'Files are only supported in protected modes.' => __('Files are only supported in protected modes.'),
+                'File too large. Maximum size is :size MB.' => __('File too large. Maximum size is :size MB.'),
+                'Uploading… :percent%' => __('Uploading… :percent%'),
+                'Keep this tab open until the upload finishes.' => __('Keep this tab open until the upload finishes.'),
+                '…or drop it here' => __('…or drop it here'),
+                'Choose a file' => __('Choose a file'),
+                'Remove' => __('Remove'),
+                'Text' => __('Text'),
+                'File' => __('File'),
+                'Upload failed. The connection dropped — please try again.' => __('Upload failed. The connection dropped — please try again.'),
+                'Download' => __('Download'),
+                'This file can only be downloaded once.' => __('This file can only be downloaded once.'),
             ]);
         @endphp
     </script>
@@ -72,6 +84,7 @@
          x-data="sniptoComponent()"
          x-init="init()"
          data-slug="{{ request()->path() }}"
+         data-max-file-bytes="{{ config('snipto.max_file_bytes') }}"
          x-on:before-unmount.window="destroy()"
          x-on:request-language-change.window="handleLanguageChangeRequest($event)"
     >
@@ -137,7 +150,7 @@
                     <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
                         {!! __('Here’s your snipto:') !!}
                     </p>
-                    <button @click="copyToClipboard($event)"
+                    <button @click="copyToClipboard($event)" x-show="!fileMeta" x-cloak
                             class="bg-indigo-500 text-white px-3 py-1 rounded text-sm shadow hover:bg-indigo-600
                                hover:shadow-md transition transform duration-150 active:scale-95">
                         {!! __('Copy') !!}
@@ -147,10 +160,30 @@
                    class="text-xs text-center text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 p-3 rounded border border-orange-200 dark:border-orange-800 w-full">
                     {!! __('Notice: This text was shared without end-to-end encryption. It was sent and stored unencrypted, and could be read while stored on the server.') !!}
                 </p>
-                <div id="snipto-payload-container"
+                <div id="snipto-payload-container" x-show="!fileMeta" x-cloak
                      class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm break-words whitespace-pre-wrap h-auto min-h-[50px] max-h-[calc(100vh-20rem)] overflow-auto">
                 </div>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center">
+                {{-- Decrypted file envelope. The download button hands out a
+                     Blob typed application/octet-stream regardless of the
+                     declared mime — metadata in the envelope is untrusted. --}}
+                <div x-show="fileMeta" x-cloak data-testid="file-card"
+                     class="p-4 border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-800 rounded shadow-sm space-y-3">
+                    <p class="font-medium break-all text-gray-800 dark:text-gray-100" data-testid="file-name" x-text="fileMeta && fileMeta.name"></p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400"><span x-text="fileMeta && fileMeta.sizeMb"></span> MB</p>
+                    <button @click="saveFilePayload()" data-testid="download-file"
+                            class="bg-indigo-500 text-white px-4 py-2 rounded text-sm shadow hover:bg-indigo-600 transition">{{ __('Download') }}</button>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('This file can only be downloaded once.') }}</p>
+                    <div class="border-l-4 border-amber-400 bg-amber-50 dark:bg-black/25 rounded px-3 py-2 flex items-start gap-2.5" data-testid="file-trust-notice" role="alert">
+                        <svg class="h-5 w-5 shrink-0 mt-0.5 text-amber-500 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                        </svg>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-800 dark:text-amber-300">{{ __('Only download files you were expecting from someone you trust.') }}</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">{{ __('Your file is encrypted end to end. Its contents cannot be altered in transit without detection, not even by us. However, encryption does not guarantee that a file is safe to open.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 text-center" x-show="!fileMeta" x-cloak>
                     {!! __('If you want to keep this Snipto, copy and paste it elsewhere. It has now been deleted from our servers and cannot be viewed again.') !!}
                 </p>
             </div>
@@ -236,9 +269,26 @@
                  x-transition.opacity.duration.500ms
                  x-transition.scale.origin.top
                  class="create-form space-y-4 transform transition-all duration-300">
-                <p class="hide-when-short text-lg font-medium text-gray-700 dark:text-gray-300">
-                    {!! __('Got something to share?') !!}
-                </p>
+                {{-- Header row: the identity line and the Text/File picker share
+                     one row, centered together (same arrangement as mobile) to
+                     buy the editor vertical space. The picker is hidden in
+                     E2EE-disabled mode: files are encrypted-only, the server
+                     rejects the combo. --}}
+                <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                    <p class="text-lg font-medium text-gray-700 dark:text-gray-300">
+                        {!! __('Got something to share?') !!}
+                    </p>
+
+                    <div x-show="protectionType !== 0" x-cloak
+                         class="inline-flex p-1 bg-gray-100 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <button type="button" data-testid="content-mode-text" @click="uploadMode = false"
+                                :class="!uploadMode ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                                class="py-1 px-4 rounded-md text-xs sm:text-sm font-medium transition-all duration-200">{{ __('Text') }}</button>
+                        <button type="button" data-testid="content-mode-file" @click="uploadMode = true"
+                                :class="uploadMode ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                                class="py-1 px-4 rounded-md text-xs sm:text-sm font-medium transition-all duration-200">{{ __('File') }}</button>
+                    </div>
+                </div>
                 {{--
                     Editor: a native <textarea> plus a line-number gutter and an
                     active-line band, both drawn by us. No third-party editor
@@ -252,7 +302,12 @@
                     Only the create form is affected; the decrypted-payload view
                     is untouched and still renders in the sandboxed iframe.
                 --}}
-                <div class="space-y-1.5">
+                {{-- Text and file panels share one grid cell (col/row-start-1)
+                     so the Text/File crossfade overlaps them instead of
+                     stacking: zero layout change, zero height jump. --}}
+                <div class="grid" x-ref="panelGrid">
+                <div class="space-y-1.5 col-start-1 row-start-1" x-ref="textPanel" x-show="!uploadMode" x-cloak
+                     x-transition.opacity.duration.200ms>
                     <div class="editor-shell" x-ref="editorShell" :class="{'is-focused': editorFocused}">
                         <div class="editor-gutter" x-ref="gutter" aria-hidden="true"></div>
                         <div class="editor-input-wrap">
@@ -278,6 +333,29 @@
                         <span x-text="editorCountLabel()"></span>
                     </div>
                 </div>
+
+                {{-- Selection UI only. The bytes are read via arrayBuffer(),
+                     enveloped and encrypted in this browser; the server ever
+                     sees opaque ciphertext in the PUT body. --}}
+                <div x-ref="filePanel" x-show="uploadMode" x-cloak data-testid="file-panel"
+                     @dragover.prevent
+                     @drop.prevent="handleDrop($event)"
+                     x-transition.opacity.duration.200ms
+                     class="col-start-1 row-start-1 flex flex-col justify-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center space-y-3 bg-gray-50 dark:bg-gray-900/30">
+                    <input type="file" x-ref="fileInput" class="hidden" data-testid="file-input"
+                           @change="setFile($event.target.files[0])">
+                    <div x-show="!selectedFile" class="space-y-2">
+                        <button type="button" @click="$refs.fileInput.click()" data-testid="file-choose"
+                                class="bg-indigo-500 text-white px-5 py-2 rounded shadow hover:bg-indigo-600 transition">{{ __('Choose a file') }}</button>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('…or drop it here') }} &middot; &le; {{ (int) (config('snipto.max_file_bytes') / 1048576) }} MB</p>
+                    </div>
+                    <div x-show="selectedFile" class="space-y-2">
+                        <p class="text-sm font-medium text-gray-700 dark:text-gray-300" data-testid="file-summary" x-text="fileSummary()"></p>
+                        <button type="button" @click="removeFile()" data-testid="file-remove"
+                                class="text-xs text-red-500 hover:underline">{{ __('Remove') }}</button>
+                    </div>
+                </div>
+                </div>{{-- /.grid shared content-panel slot --}}
 
                 <div class="flex flex-col items-center space-y-4 w-full max-w-2xl mx-auto">
                     <div class="flex flex-col sm:flex-row items-center justify-center gap-3 w-full">
@@ -308,7 +386,10 @@
                             </button>
 
                             <!-- Mode 0: E2EE Disabled -->
-                            <button data-testid="mode-btn-0" @click="protectionType = 0"
+                            {{-- Hidden entirely in file mode: files are encrypted-only
+                                 (server 422s the combo), so offering the option would
+                                 only let the user walk into a refusal. --}}
+                            <button data-testid="mode-btn-0" x-show="!uploadMode" x-cloak @click="selectPlaintextMode()"
                                     :disabled="isThrottled || isLockedOut || plaintextSlugTooShort"
                                     :title="plaintextSlugTooShort ? t('E2EE disabled needs a link of at least 8 characters — for unencrypted sniptos the link itself is the only protection. Choose a longer link to enable this mode.') : ''"
                                     :class="protectionType === 0 ? 'bg-white dark:bg-gray-700 shadow-sm text-orange-600 dark:text-orange-400' : ((isThrottled || isLockedOut || plaintextSlugTooShort) ? 'text-gray-500' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300')"
@@ -430,7 +511,7 @@
                                        placeholder="{{ __('Recipient\'s Snipto ID') }}"
                                        class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-indigo-400 focus:outline-none dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 transition-colors duration-200">
                                 
-                                <div class="hide-when-short text-xs text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 p-3 rounded border border-gray-200 dark:border-gray-800">
+                                <div class="text-xs text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/30 p-3 rounded border border-gray-200 dark:border-gray-800">
                                     {!! __('Important: Double-check the recipient’s Snipto ID. If you enter it incorrectly, they will not be able to decrypt or read your message.') !!}
                                 </div>
                             </div>
@@ -456,17 +537,24 @@
                         <span x-show="isThrottled" x-text="t('You attempted too many times. Please try again in :seconds seconds.', { ':seconds': throttleCountdown })"></span>
                         <span x-show="isLockedOut" x-text="t('You have been temporarily locked out. Please check back later.')"></span>
                     </div>
+                    <div x-show="uploadPercent !== null" x-cloak class="w-full max-w-2xl space-y-1" data-testid="upload-progress">
+                        <div class="text-xs text-gray-500 dark:text-gray-400" x-text="t('Uploading… :percent%', { ':percent': uploadPercent })"></div>
+                        <div class="h-2 bg-gray-200 dark:bg-gray-800 rounded overflow-hidden">
+                            <div class="h-2 bg-indigo-500 transition-all duration-150" :style="'width:' + uploadPercent + '%'"></div>
+                        </div>
+                        <p class="text-[11px] text-gray-400 text-center">{{ __('Keep this tab open until the upload finishes.') }}</p>
+                    </div>
                     <button data-testid="create-submit" @click="submitSnipto()"
-                            :disabled="isThrottled || isLockedOut"
+                            :disabled="!submitReady"
                             class="bg-indigo-500 text-white px-6 py-2 rounded shadow hover:bg-indigo-600
-                           hover:shadow-lg transition transform duration-150 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
+                           hover:shadow-lg transition duration-150 active:scale-95 disabled:active:scale-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-500 disabled:hover:shadow-none">
                         {!! __('Snipto it') !!}
                     </button>
                     <!-- Terms of Service notice -->
                     <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
                         {!! __('By using Snipto, you agree with the') !!} <a href="/terms" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{!! __('Terms of Service') !!}</a>.
                     </p>
-                    <p class="hide-when-short text-xs text-gray-500 dark:text-gray-400 text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
                         {{ __('Keep your data safe by following our') }} <a href="/safety" class="underline hover:text-indigo-500 dark:hover:text-indigo-400">{{ __('safety tips') }}</a>.
                     </p>
                 </div>

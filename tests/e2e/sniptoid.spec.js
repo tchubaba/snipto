@@ -65,23 +65,29 @@ test('snipto ID: generate -> encrypt -> decrypt with passphrase', async ({ newCo
     await expectPayloadShows(page, sentinel);
 });
 
-// Mode-3 creation gate (snipto.js submitSnipto): empty and malformed Snipto
-// IDs are rejected client-side with toasts — no crypto work, no POST, no
-// success screen. The 64-char format check mirrors the ID the /sniptoid page
-// produces (base64 of salt(16) || pubkey(32)).
-test('snipto ID editor: empty and malformed IDs are rejected client-side', async ({ page }) => {
+// Mode-3 creation gate (snipto.js submitReady getter): the submit button
+// stays DISABLED until a well-formed recipient ID is present - an incomplete
+// form is simply inert, no click, no toast, no POST. The 64-char format
+// check mirrors the ID the /sniptoid page produces (base64 of
+// salt(16) || pubkey(32)); the deeper X25519 ladder check (audit F-2) still
+// runs at submit time inside submitSnipto, so a well-formed but degenerate
+// ID re-enables the button yet is rejected before any crypto lands.
+test('snipto ID editor: submit stays disabled until the ID is well-formed', async ({ page }) => {
     const slug = uniqueSlug('id');
     await page.goto(`/${slug}`);
     await page.getByTestId('mode-btn-3').click();
     await page.getByTestId('content-textarea').fill(uniqueSentinel('ID-GATE'));
 
-    await page.getByTestId('create-submit').click();
-    await expectToast(page, 'enter a Snipto ID');
+    // Content alone is not enough in mode 3.
+    await expect(page.getByTestId('create-submit')).toBeDisabled();
 
     // 63 chars + '!' -> fails both length and charset.
     await page.getByTestId('create-sniptoid-input').fill('a'.repeat(63) + '!');
-    await page.getByTestId('create-submit').click();
-    await expectToast(page, 'Invalid Snipto ID format');
+    await expect(page.getByTestId('create-submit')).toBeDisabled();
+
+    // Well-formed (base64 charset, exactly 64): clickable now.
+    await page.getByTestId('create-sniptoid-input').fill('a'.repeat(64));
+    await expect(page.getByTestId('create-submit')).toBeEnabled();
 
     await expect(page.getByTestId('success-url-input')).toBeHidden();
 });
