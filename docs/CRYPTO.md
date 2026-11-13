@@ -1,7 +1,7 @@
 # How Snipto's Cryptography Works
 
 *A complete, implementation-accurate walkthrough. Every parameter below is copied from the
-code, not from a design doc that drifted from it — the relevant functions are linked so you
+code, not from a design doc that drifted from it; the relevant functions are linked so you
 can check each claim line by line. If anything here disagrees with the code, the code wins
 and we want to hear about it.*
 
@@ -11,8 +11,8 @@ and we want to hear about it.*
 
 1. **Zero-knowledge:** the server stores ciphertext and public bootstrap values only. Keys,
    passphrases, and URL secrets are born and die inside the browser.
-2. **Memory-hard everywhere:** every path from a human secret to a key — and to the
-   server-facing authorization token — passes through Argon2id at the OWASP strong tier.
+2. **Memory-hard everywhere:** every path from a human secret to a key, and to the
+   server-facing authorization token, passes through Argon2id at the OWASP strong tier.
 3. **Identity without accounts:** the Snipto ID mode gives you a public, email-like
    identifier that others can encrypt to, with a private key that never exists anywhere
    except transiently in your browser.
@@ -26,13 +26,13 @@ and we want to hear about it.*
 
 | Purpose | Primitive |
 |---|---|
-| Authenticated encryption | AES-256-GCM (12-byte nonce, 128-bit tag) — WebCrypto |
-| Secondary integrity | HMAC-SHA256 (independent key) — WebCrypto |
-| Password / secret hashing | Argon2id (`ARGON2ID13`), 32-byte output — libsodium (WASM) |
-| Key splitting | HKDF-SHA256 — WebCrypto |
-| Key agreement | X25519 — libsodium (`crypto_scalarmult`) |
+| Authenticated encryption | AES-256-GCM (12-byte nonce, 128-bit tag), WebCrypto |
+| Secondary integrity | HMAC-SHA256 (independent key), WebCrypto |
+| Password / secret hashing | Argon2id (`ARGON2ID13`), 32-byte output, libsodium (WASM) |
+| Key splitting | HKDF-SHA256, WebCrypto |
+| Key agreement | X25519, libsodium (`crypto_scalarmult`) |
 | Public-key validation | BigInt Montgomery ladder, `[order]P = identity` (RFC 9496) |
-| Salt derivation | SHA-256 with domain-separation prefixes — WebCrypto |
+| Salt derivation | SHA-256 with domain-separation prefixes, WebCrypto |
 | RNG | `crypto.getRandomValues` everywhere; rejection sampling (never modulo) for strings |
 
 **Argon2id parameters (all modes, identical):** memory = 64 MiB, `opsLimit` = 3,
@@ -46,7 +46,7 @@ browsers (Tor, Mullvad Browser) block `crypto.subtle.exportKey('jwk', …)` for 
 `privacy.resistFingerprinting`. Same algorithms, same outputs, broader compatibility. A
 single `supportsLibsodium()` probe gates the **Snipto ID mode** with an "update your
 browser" fallback (banner on `/sniptoid`, Mode-3 button hidden on the main page); Modes
-1–2 need libsodium (`crypto_pwhash`) too, at submit/decrypt time, but are not behind
+1-2 need libsodium (`crypto_pwhash`) too, at submit/decrypt time, but are not behind
 that probe.
 
 ---
@@ -69,11 +69,11 @@ returns it in the pre-auth metadata response: it's an IV/salt, not a secret.
 ### 3.1 File payloads (`kind = file`): inner envelope + binary transport
 
 Text payloads travel as JSON strings. A file payload instead *reserves* the row with a
-metadata-only `POST /api/snipto` (`kind: "file"` — the server receives **no filename, no
+metadata-only `POST /api/snipto` (`kind: "file"`; the server receives **no filename, no
 MIME type, no declared size**) and then *lands* the ciphertext with
 `PUT /api/snipto/{slug}/payload`: a raw `application/octet-stream` body authorized by the
 one-time `X-Upload-Token` handed out by the reserve call. No base64 anywhere on the file
-path — the bytes go up exactly as they come down (that is what makes 50 MiB feasible;
+path: the bytes go up exactly as they come down (that is what makes 50 MiB feasible;
 base64 would inflate the wire by a third and the storage column by the same).
 
 Before encryption, the browser wraps the file in an **inner envelope**:
@@ -84,12 +84,12 @@ plaintext = [u16 BE headerLen][header JSON {"n": name, "m": MIME, "s": byteLengt
 
 The header lives *inside* the ciphertext, so name and type never appear in any server-visible
 place (`store()` has nothing to validate them against because they were never sent). The
-encrypted output — the same `ciphertext ‖ GCM-tag ‖ HMAC` framing as above — is stored
+encrypted output, the same `ciphertext ‖ GCM-tag ‖ HMAC` framing as above, is stored
 verbatim in a `LONGBLOB` column (`payload_blob`), never base64'd. Retrieval is symmetric:
 `reveal` returns the bytes as `application/octet-stream`; the browser decrypts, parses the
 envelope, and offers a download. The HTTP `Content-Type` is a hardcoded
-`application/octet-stream` on both legs — the sender's MIME string is untrusted display
-metadata recovered from inside the ciphertext, never echoed into a response header — so a
+`application/octet-stream` on both legs: the sender's MIME string is untrusted display
+metadata recovered from inside the ciphertext, never echoed into a response header; so a
 stored `text/html` payload can never render anywhere.
 
 Files are encrypted-only: `kind: "file"` with `protection_type: 0` is a 422 at creation.
@@ -99,15 +99,15 @@ file-specific threat treatments.
 
 ---
 
-## 4. Mode 1 — URL Secret (default)
+## 4. Mode 1: URL Secret (default)
 
 The key material is a random secret that the server never sees, carried in the URL
-**fragment** (`#k=…`) — fragments are never transmitted to any server, never logged, never
+**fragment** (`#k=…`): fragments are never transmitted to any server, never logged, never
 in `Referer`.
 
 1. **Secret:** 21 characters from `[A-Za-z0-9]` (≈125 bits), generated with rejection
-   sampling (`generateShortSecret`) — bytes ≥ 248 are discarded so there is zero modulo bias.
-2. **KDF salt:** `SHA-256("snipto-urlsecret-v1" ‖ nonceHex)[0:16]` — domain-separated so this
+   sampling (`generateShortSecret`): bytes ≥ 248 are discarded so there is zero modulo bias.
+2. **KDF salt:** `SHA-256("snipto-urlsecret-v1" ‖ nonceHex)[0:16]`; domain-separated so this
    mode's salts can never collide with another mode's.
 3. **Master:** `Argon2id(secret, salt, m=64MiB, t=3, p=1) → 32 bytes`.
 4. **Split (HKDF-SHA256, salt = `nonceHex`):**
@@ -121,38 +121,38 @@ The Argon2id step here is deliberate: even though the 21-char secret already has
 running it through a memory-hard KDF means the `key_hash` the server holds costs the same
 64 MB/guess to attack as the ciphertext would (§7).
 
-## 5. Mode 2 — Password Protected
+## 5. Mode 2: Password Protected
 
 Identical to Mode 1 except: the secret is your password (min 12 chars, enforced client-side),
 the salt prefix is `"snipto-password-v2"`, and the recipient learns the nonce from the
 metadata probe before deriving. The password never leaves the browser; the server sees only
 `key_hash` comparisons.
 
-Because `key_hash` depends on the nonce, retrieval is two-step for Modes 1–2:
-`GET /api/snipto/{slug}` returns `{protection_type, nonce, reveal_token}` — never the
-payload — then the client derives and `POST`s `{reveal_token, key_hash}` to
+Because `key_hash` depends on the nonce, retrieval is two-step for Modes 1-2:
+`GET /api/snipto/{slug}` returns `{protection_type, nonce, reveal_token}}, never the
+payload, then the client derives and `POST`s `{reveal_token, key_hash}` to
 `/api/snipto/{slug}/reveal`. Both modes spend exactly one `GET` (the page-load probe)
 plus this one `POST` per view: the probe hands the viewer the nonce and a
 `reveal_token` that stays valid until a reveal attempt burns it. Only a *failed*
 attempt forces a re-probe (a fresh `GET`) before the retry can post again.
 
-## 6. Mode 3 — Snipto ID (asymmetric)
+## 6. Mode 3: Snipto ID (asymmetric)
 
 The interesting one: an **identity** you publish once, so anyone can encrypt to you with no
 key exchange, no shared secret, and no account.
 
 ### 6.1 Identity generation (`/sniptoid`, `resources/js/sniptoid.js`)
 1. Roll a fresh 16-byte random salt (`crypto.getRandomValues`).
-2. `privateKey = Argon2id(passphrase, salt, m=64MiB, t=3, p=1)` → 32 raw bytes — used
-   directly as the X25519 private key. (The raw bytes are *not* pre-clamped — a random 32-byte
-   string satisfies the clamping constraints only rarely — but libsodium's `crypto_scalarmult`
+2. `privateKey = Argon2id(passphrase, salt, m=64MiB, t=3, p=1)` → 32 raw bytes, used
+   directly as the X25519 private key. (The raw bytes are *not* pre-clamped; a random 32-byte
+   string satisfies the clamping constraints, but libsodium's `crypto_scalarmult`
    clamps the scalar internally, so feeding it `crypto_pwhash` output directly is safe.)
 3. `pubkey = crypto_scalarmult_base(privateKey)`.
 4. **Snipto ID = `base64(salt(16) ‖ pubkey(32))`** → 64 chars, no padding.
 
 The salt is *published inside the ID* and stored per-snipto as `recipient_salt`. That's by
 design: it makes every Snipto ID its own 64 MB/guess keyspace (rainbow tables die) while
-leaking nothing an attacker doesn't already have — the salt is public either way. It also
+leaking nothing an attacker doesn't already have; the salt is public either way. It also
 means the recipient only needs **passphrase + saved ID** to regenerate the keypair; the
 private key is never stored, never transmitted, and is `memzero`'d after use.
 
@@ -162,14 +162,14 @@ keypair.
 
 ### 6.2 Sending (sender's browser)
 1. Parse the recipient's ID → `recipient_salt ‖ recipient_pubkey`.
-2. **Validate the recipient's public key** (§8) — reject before paying any ECDH.
+2. **Validate the recipient's public key** (§8): reject before paying any ECDH.
 3. Generate an **ephemeral** X25519 keypair (fresh per snipto).
 4. `shared = crypto_scalarmult(ephemeral_priv, recipient_pub)`.
-5. Keys via HKDF-SHA256, salt = `"snipto-enc-v1"`, and — this is the part most
-   implementations skip — the HKDF `info` binds **both public keys**:
+5. Keys via HKDF-SHA256, salt = `"snipto-enc-v1"`, and, this is the part most
+   implementations skip, the HKDF `info` binds **both public keys**:
    `info = "aes-key" ‖ sorted(my_pub, their_pub)` (likewise `"hmac-key"`). Key-substitution
    resistance: a different keypair pair derives different keys, full stop.
-6. `key_hash = SHA-256(shared)` — sent to the server as the authorization token.
+6. `key_hash = SHA-256(shared)`, sent to the server as the authorization token.
 7. Ship: ciphertext envelope, nonce, `sender_public_key` (ephemeral), `recipient_salt`,
    `key_provider_type="passphrase"`.
 
@@ -177,18 +177,18 @@ keypair.
 1. Metadata probe returns `sender_public_key`, `recipient_salt`, `key_provider_type`.
 2. Derive the keypair from passphrase + `recipient_salt` (same `deriveX25519KeyPair`, kept
    byte-for-byte identical between `snipto.js` and `sniptoid.js` via `// SYNC:` markers).
-3. **Validate `sender_public_key`** — the server-supplied one. This is not paranoia: a
+3. **Validate `sender_public_key`**: the server-supplied one. This is not paranoia: a
    hostile sender can deliver a small-order or twist point and recover a long-lived private
    key from the resulting `key_hash` (a Lim-style attack with an offline oracle). §8.
 4. ECDH → same HKDF labels (the recipient's own pubkey is re-derived, so the binding works
    symmetrically) → decrypt.
 
-## 7. The `key_hash` — why the authorization token is memory-hard
+## 7. The `key_hash`: why the authorization token is memory-hard
 
 A naive design stores `SHA-256(password)` server-side: one unsalted SHA-256 per guess,
 trivially deduplicated across snippets, rainbow-table-able. Snipto instead derives
 `key_hash` from the **same Argon2id master** as the ciphertext, via a third HKDF label
-(`"key-hash"`) — or, for Snipto ID, as SHA-256 of the raw ECDH shared secret (already
+(`"key-hash"`), or, for Snipto ID, as SHA-256 of the raw ECDH shared secret (already
 full-entropy group-element bytes).
 
 Consequence: an attacker who exfiltrates the database pays the **identical** 64 MB/guess
@@ -197,7 +197,7 @@ cheaper oracle than the encryption itself, and per-snipto nonce-derived salts de
 cross-snipto dedup.
 
 Online, the check is `hash_equals()` (timing-safe), runs **before** the payload is returned
-or the view counter decrements — a wrong secret never consumes the snippet — and every
+or the view counter decrements, a wrong secret never consumes the snippet, and every
 attempt burns a one-time `reveal_token` (SHA-256-hashed at rest, 15-min TTL, overwritten by
 each new probe), forcing attackers back through the tiered per-IP throttle
 (20/min → 10/2min → 5/5min → 12 h lockout).
@@ -208,7 +208,7 @@ each new probe), forcing attackers back through the tiered per-IP throttle
 a point is accepted iff `[order]P = identity`, computed with a pure-BigInt Montgomery ladder
 over the u-coordinate. This rejects:
 
-- the `u = 0` and `u = ±1` degenerate cases (`u = 0, 1, p−1` — small-order points). Byte-wise
+- the `u = 0` and `u = ±1` degenerate cases (`u = 0, 1, p−1`; small-order points). Byte-wise
   these are `0x00` × 32, `0x01` followed by 31 `0x00` (little-endian), and `p−1`. "All-one"
   (`0xff` × 32) is *not* one of them: the high-bit mask decodes it to `2^255 − 1 ≡ 18 (mod p)`.
 - every twist-curve point (the Lim attack class),
@@ -220,14 +220,14 @@ all-zero-shared-secret check. The implementation is pinned by RFC 7748 test vect
 cross-checked against libsodium in `tests/js/x25519-validation.test.mjs` (CI); the reject
 path is exercised end-to-end by the trap-key test in `tests/e2e/sniptoid.spec.js`.
 
-## 9. Mode 0 — Plaintext (E2EE disabled)
+## 9. Mode 0: Plaintext (E2EE disabled)
 
-No crypto at all: the payload is stored as-is and the slug is the only access control —
+No crypto at all: the payload is stored as-is and the slug is the only access control:
 which is why the server enforces slug ≥ 8 chars for this mode (a 3-word diceware slug is
-~31–38 bits) and the UI warns loudly. Included for non-sensitive convenience sharing
+~31-38 bits) and the UI warns loudly. Included for non-sensitive convenience sharing
 (e.g. a long URL to text somewhere). It is not a security mode and the threat model says so.
 Files cannot use it: `kind: "file"` + `protection_type: 0` is rejected 422 before anything
-is asked to upload — there would be no crypto to retroactively protect the bytes.
+is asked to upload: there would be no crypto to retroactively protect the bytes.
 
 ## 10. Protocol summary (wire view)
 
@@ -257,7 +257,7 @@ Reveal:       POST /api/snipto/{slug}/reveal
   403s).
 - Views: forced to 1 (single-use; a file means exactly one download). Expiry: 1 h default;
   1 h/1 d/1 w for Password and Snipto ID modes. Expired rows purged every 15 min.
-- Every snippet endpoint — including the file `PUT` — tiered-throttled per real client IP.
+- Every snippet endpoint, including the file `PUT`, tiered-throttled per real client IP.
 
 ## 11. Threat-model cross-references
 
@@ -268,8 +268,8 @@ Reveal:       POST /api/snipto/{slug}/reveal
 
 - RFC 7748 (X25519), RFC 9496 (X25519 validation), RFC 5869 (HKDF)
 - OWASP Argon2 parameter cheat sheet (the strong tier we pin)
-- "lim: breaking X25519 in the wild" — the attack class §8 defends against
+- "lim: breaking X25519 in the wild": the attack class §8 defends against
 - libsodium `crypto_pwhash` Argon2id docs
 
-*Corrections welcome — an error in this document that matches an error in the code is a bug
+*Corrections welcome: an error in this document that matches an error in the code is a bug
 report with extra steps.*

@@ -1,3 +1,8 @@
+# Explicit project name: docker compose otherwise derives the project name from the
+# checkout directory. 'snipto' matches what deployed servers have always resolved to
+# (main-checkout directory name), so down/up cycles after this line selects the exact
+# same containers as before; the label just stops being checkout-path dependent.
+name: snipto
 services:
   app:
     restart: unless-stopped

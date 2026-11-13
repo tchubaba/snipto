@@ -1,3 +1,10 @@
+# Explicit project name: docker compose otherwise derives the project name from the
+# checkout directory, so the identical stack resolves under a *different* project from
+# a worktree or renamed clone, and compose calls issued from those paths target a
+# phantom empty project ("service app is not running" from the pre-commit hook).
+# 'snipto' is exactly what default derivation already yields in the main checkout:
+# existing containers and names are unaffected by this line.
+name: snipto
 services:
     app:
         build:

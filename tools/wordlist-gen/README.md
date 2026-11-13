@@ -26,40 +26,40 @@ into `tools/wordlist-gen/.cache/` (gitignored) and reused on subsequent runs.
 ## Pipeline
 
 1. Download a frequency-ranked corpus for the target language.
-2. Filter: length 4–8, allowed character set (lowercase + diacritics), blacklist.
+2. Filter: length 4-8, allowed character set (lowercase + diacritics), blacklist.
 3. Validate against the language's Hunspell dictionary if configured. Hunspell is
-   case-sensitive — proper nouns stored capitalized in the `.dic` are rejected
+   case-sensitive: proper nouns stored capitalized in the `.dic` are rejected
    when looked up in lowercase, which is exactly what we want.
 4. Stem-blacklist check: extract every possible Hunspell lemma for the candidate
    (including each part of a compound, e.g. German `Krankenhaus` → `Kranken` +
    `Haus`); reject if any stem appears in the folded blacklist. This kills all
-   conjugated/inflected forms of a blacklisted lemma — blacklist `matar` once
+   conjugated/inflected forms of a blacklisted lemma: blacklist `matar` once
    and `mataré`, `mataba`, `matarlo` are all caught automatically.
 5. Greedy by frequency, enforce the prefix property (no word is a prefix of
    another), keep the top 7,776.
 5. Sort alphabetically, emit JS.
 
-7,776 = 6⁵ — standard 5-dice diceware size, ~12.92 bits/word. 5 words ≈ 64.6 bits,
+7,776 = 6⁵: standard 5-dice diceware size, ~12.92 bits/word. 5 words ≈ 64.6 bits,
 matching the entropy of the existing 6-word EFF Short #1 English passphrase.
 
 ## Adding a language
 
 Add an entry to `LANGUAGES` in `generate.py`. Required:
 
-- `code` — Snipto locale code (e.g. `"es"`, `"fr"`, `"de"`).
-- `source_url` — frequency-ranked word list, one `word count` per line.
-- `allowed_chars` — regex character class for valid letters in this language.
-- `description` — attribution line for the JS header.
+- `code`: Snipto locale code (e.g. `"es"`, `"fr"`, `"de"`).
+- `source_url`: frequency-ranked word list, one `word count` per line.
+- `allowed_chars`: regex character class for valid letters in this language.
+- `description`: attribution line for the JS header.
 
 Optional but strongly recommended:
 
-- `dict_dic_url` / `dict_aff_url` — Hunspell dictionary for spell-check
-  validation. Use language-specific dictionaries — German with a French dictionary
+- `dict_dic_url` / `dict_aff_url`: Hunspell dictionary for spell-check
+  validation. Use language-specific dictionaries: German with a French dictionary
   will reject everything.
-- `dict_attribution` — license/credit line for the dictionary.
-- `ldnoobw_lang` — file name in the LDNOOBW repo (e.g. `"pt"`, `"de"`, `"es"`,
+- `dict_attribution`: license/credit line for the dictionary.
+- `ldnoobw_lang`: file name in the LDNOOBW repo (e.g. `"pt"`, `"de"`, `"es"`,
   `"fr"`). Auto-fetched and merged into the blacklist.
-- `capitalize_lookup=True` — set for languages where common nouns are
+- `capitalize_lookup=True`: set for languages where common nouns are
   conventionally capitalized (German). Hunspell validation also tries the
   title-cased form, otherwise all common nouns get rejected.
 
@@ -83,10 +83,10 @@ entries like `acao` will block `ação`.
 
 | Source | Purpose | License |
 |--------|---------|---------|
-| [LDNOOBW per-language](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words) | Profanity (60–80 entries per language) | MIT |
-| [Matthias Winkelmann firstname-database](https://github.com/MatthiasWinkelmann/firstname-database) | ~45k personal names across 50+ countries — kills name leaks from subtitle corpora | GFDL 1.2+ |
+| [LDNOOBW per-language](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words) | Profanity (60-80 entries per language) | MIT |
+| [Matthias Winkelmann firstname-database](https://github.com/MatthiasWinkelmann/firstname-database) | ~45k personal names across 50+ countries; kills name leaks from subtitle corpora | GFDL 1.2+ |
 
-We do not redistribute the dictionary `.dic` / `.aff` files — they are consumed
+We do not redistribute the dictionary `.dic` / `.aff` files; they are consumed
 at build time only. The generated wordlist is a derivative work, but word
 frequency counts and individual common words are not copyrightable; the thin
 compilation copyright over the *generated selection* belongs to this project.

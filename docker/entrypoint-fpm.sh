@@ -29,7 +29,9 @@ else
 
     if [ ! -d public/build ] || [ -z "$(ls -A public/build 2>/dev/null)" ]; then
         echo "Building frontend assets..."
-        npm install
+        # One-shot build environment: a clean lockfile-exact install beats an
+        # incremental one here.
+        npm ci
         npm run build
     fi
 fi

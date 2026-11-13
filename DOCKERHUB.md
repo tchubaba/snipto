@@ -2,23 +2,23 @@
 
 **Secure, ephemeral, end-to-end encrypted snippet sharing.**
 
-Snipto lets you share text snippets and files (up to 50 MiB) via single-use URLs. Content is encrypted in the browser before it ever leaves the device — the server stores ciphertext only and has no way to read it. Snippets self-destruct after the first view or download (or after their expiration window).
+Snipto lets you share text snippets and files (up to 50 MiB) via single-use URLs. Content is encrypted in the browser before it ever leaves the device: the server stores ciphertext only and has no way to read it. Snippets self-destruct after the first view or download (or after their expiration window).
 
 - End-to-end encrypted (AES-256-GCM client-side; key never touches the server)
 - Three protection modes: random link-key, password, or asymmetric **Snipto ID** (X25519 ECDH)
-- File sharing up to 50 MiB — same E2EE envelope (name, type, and contents encrypted in your browser; the server stores opaque ciphertext only), protected modes only, single download, uploads not resumable
+- File sharing up to 50 MiB (same E2EE envelope: name, type, and contents encrypted in your browser; the server stores opaque ciphertext only), protected modes only, single download, uploads not resumable
 - Memory-hard key derivation (Argon2id) for password and Snipto ID modes
 - Built-in diceware passphrase generator with reveal/copy gate
 - Single-use, auto-expiring (1 hour default; up to 1 week for password / Snipto ID)
 - QR codes for mobile sharing
 - Strict CSP, Trusted Types, sandboxed iframe rendering, COOP/COEP/CORP isolation
-- Self-contained image — no internet access required at runtime
+- Self-contained image: no internet access required at runtime
 
 ### Protection modes
 
-- **URL Secret** — random AES-256-GCM key embedded in the URL fragment (`#k=…`). Argon2id (64 MB, t=3) → HKDF-SHA256 → separate AES-GCM and HMAC keys. `key_hash` = HKDF-derived from Argon2id master (memory-hard). Never sent to the server; two-step retrieval: pre-auth GET returns nonce, client derives key_hash, second request retrieves payload.
-- **Password** — recipient enters a shared password. Argon2id (64 MB, t=3) → HKDF-SHA256 → separate AES-GCM and HMAC keys.
-- **Snipto ID** — publish a 64-character ID derived from your passphrase via X25519 + Argon2id. Senders encrypt to your public key; only your passphrase can decrypt. Private keys are never stored or transmitted — re-derived in the browser on demand.
+- **URL Secret**: random AES-256-GCM key embedded in the URL fragment (`#k=…`). Argon2id (64 MB, t=3) → HKDF-SHA256 → separate AES-GCM and HMAC keys. `key_hash` = HKDF-derived from Argon2id master (memory-hard). Never sent to the server; two-step retrieval: pre-auth GET returns nonce, client derives key_hash, second request retrieves payload.
+- **Password**: recipient enters a shared password. Argon2id (64 MB, t=3) → HKDF-SHA256 → separate AES-GCM and HMAC keys.
+- **Snipto ID**: publish a 64-character ID derived from your passphrase via X25519 + Argon2id. Senders encrypt to your public key; only your passphrase can decrypt. Private keys are never stored or transmitted; re-derived in the browser on demand.
 
 Built on Laravel 13, PHP 8.5, Alpine.js (CSP build), Tailwind CSS 4.
 
@@ -37,7 +37,7 @@ docker run -d \
   tchubaba/snipto:latest
 ```
 
-Open http://localhost:8080 and start sharing. Set `APP_KEY` once and reuse the same value across container recreations — otherwise existing sessions and signed URLs become invalid (snippet content is encrypted client-side and is unaffected). If you omit `APP_KEY`, one is auto-generated on first boot but it lives in the container's ephemeral `.env` and will rotate on every recreation.
+Open http://localhost:8080 and start sharing. Set `APP_KEY` once and reuse the same value across container recreations; otherwise existing sessions and signed URLs become invalid (snippet content is encrypted client-side and is unaffected). If you omit `APP_KEY`, one is auto-generated on first boot but it lives in the container's ephemeral `.env` and will rotate on every recreation.
 
 ---
 
@@ -50,9 +50,9 @@ Open http://localhost:8080 and start sharing. Set `APP_KEY` once and reuse the s
 | `APP_PORT` | `8080` | Internal listen port |
 | `APP_DEBUG` | `false` | Keep `false` in production |
 | `DB_CONNECTION` | `mysql` | `mysql`, `mariadb`, `pgsql`, `sqlite` |
-| `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | — | Required for non-SQLite |
+| `DB_HOST` / `DB_PORT` / `DB_DATABASE` / `DB_USERNAME` / `DB_PASSWORD` | (none) | Required for non-SQLite |
 | `SESSION_SECURE_COOKIE` | `true` | Set `false` only when testing over plain HTTP |
-| `TRUSTED_PROXIES` | *(unset)* | Set **only** when a reverse proxy fronts the container — see [Behind a reverse proxy](#behind-a-reverse-proxy) |
+| `TRUSTED_PROXIES` | *(unset)* | Set **only** when a reverse proxy fronts the container (see [Behind a reverse proxy](#behind-a-reverse-proxy)) |
 
 The container runs migrations on boot and waits for the database to be reachable.
 
@@ -71,11 +71,11 @@ docker run -d \
   tchubaba/snipto:latest
 ```
 
-> **Note:** with file sharing enabled, an external MariaDB/MySQL must be configured with `max_allowed_packet >= 128M` — file payloads are stored as single rows up to 50 MiB, which exceeds the 16 MiB server default.
+> **Note:** with file sharing enabled, an external MariaDB/MySQL must be configured with `max_allowed_packet >= 128M` : file payloads are stored as single rows up to 50 MiB, which exceeds the 16 MiB server default.
 
 ### Persistence
 
-For SQLite, mount a volume at the path you point `DB_DATABASE` to (as in the quick-start example). For external databases, persistence lives on the database server — no volume needed.
+For SQLite, mount a volume at the path you point `DB_DATABASE` to (as in the quick-start example). For external databases, persistence lives on the database server; no volume needed.
 
 ### Behind a reverse proxy
 
@@ -107,9 +107,9 @@ location / {
 }
 ```
 
-`TRUSTED_PROXIES` takes a single IP, a CIDR, or a comma-separated list. Use the address the **app container sees as the connection peer** — on a shared Docker network that is the proxy's container address, not its public one. Giving the proxy a static `ipv4_address` and trusting exactly that is the tight option; trusting the network's whole CIDR is easier but means any container on that network can assert a client address.
+`TRUSTED_PROXIES` takes a single IP, a CIDR, or a comma-separated list. Use the address the **app container sees as the connection peer**: on a shared Docker network that is the proxy's container address, not its public one. Giving the proxy a static `ipv4_address` and trusting exactly that is the tight option; trusting the network's whole CIDR is easier but means any container on that network can assert a client address.
 
-**Never set it to `*`.** That trusts the connection peer whatever it is — including the browser — so a visitor can send any `X-Forwarded-For` they like and get a fresh rate-limit key with every request. The tiered limiter would then be keyed on a value the attacker chose.
+**Never set it to `*`.** That trusts the connection peer whatever it is, including the browser, so a visitor can send any `X-Forwarded-For` they like and get a fresh rate-limit key with every request. The tiered limiter would then be keyed on a value the attacker chose.
 
 ### Exposed directly, with no proxy
 
@@ -117,15 +117,15 @@ If you publish `8080` yourself, **leave `TRUSTED_PROXIES` unset.** The client's 
 
 Two things to know before running this way:
 
-- **No TLS.** The container runs PHP's built-in server, which cannot terminate TLS. Snippet content is encrypted in the browser before it leaves it, but that guarantee depends on the browser running untampered JavaScript — over plain HTTP an on-path attacker can rewrite the page and capture a passphrase or password *before* encryption happens. Plain HTTP is for LAN use and testing; anything routable should sit behind a TLS-terminating proxy.
+- **No TLS.** The container runs PHP's built-in server, which cannot terminate TLS. Snippet content is encrypted in the browser before it leaves it, but that guarantee depends on the browser running untampered JavaScript; over plain HTTP an on-path attacker can rewrite the page and capture a passphrase or password *before* encryption happens. Plain HTTP is for LAN use and testing; anything routable should sit behind a TLS-terminating proxy.
 - **One request at a time.** `PHP_CLI_SERVER_WORKERS` is not set, so the built-in server serialises requests (including 50 MiB file uploads and downloads). The image sets `post_max_size = 128M` and `memory_limit = 384M` out of the box so 50 MiB encrypted file payloads work without extra PHP ini mounts.
 
 ---
 
 ## Tags
 
-- `latest` — most recent stable release
-- `vX.Y.Z` — pinned version (e.g. `v1.2.2`)
+- `latest`: most recent stable release
+- `vX.Y.Z`: pinned version (e.g. `v1.2.2`)
 
 ### Secure Deployment (Recommended)
 

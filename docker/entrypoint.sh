@@ -24,8 +24,14 @@ if [ "$APP_ENV" = "local" ]; then
     echo "Generating IDE helper files..."
     php artisan ide-helper:generate || true
 
+    # --no-save: the lockfile is owned by the host checkout. The container's npm is a
+    # different major than the host's, and a plain install rewrites package-lock.json
+    # in the container npm's older shape (dropping newer metadata fields and taking the
+    # root package name from the container mount path, /var/www/html). That rewrite is
+    # pure churn in the bind mount. --no-save installs exactly what the lockfile pins
+    # and never touches it.
     echo "Installing and starting Node.js assets..."
-    npm install
+    npm install --no-save
     npm run dev &
 
     # Initialize GrumPHP
@@ -51,7 +57,9 @@ else
 
         if [ ! -d public/build ] || [ -z "$(ls -A public/build 2>/dev/null)" ]; then
             echo "Building frontend assets..."
-            npm install
+            # One-shot build environment: a clean lockfile-exact install beats an
+            # incremental one here.
+            npm ci
             npm run build
         fi
     fi

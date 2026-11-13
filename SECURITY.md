@@ -4,8 +4,8 @@
 
 | Version  | Supported          |
 |----------| ------------------ |
-| 1.18.0   | :white_check_mark: |
-| < 1.18.0 | :x:                |
+| 1.18.0   | Yes |
+| < 1.18.0 | No                |
 
 ## Reporting a Vulnerability
 
@@ -13,8 +13,8 @@
 
 If you discover a security vulnerability, please report it privately using one of the following channels:
 
-1.  **GitHub Private Vulnerability Reporting (Preferred)** — go to the repository's **Security** tab and click **"Report a vulnerability"**. This creates a private advisory visible only to maintainers and provides a structured workflow for triage, fix coordination, and CVE assignment.
-2.  **Email** — send the details to **[contact@snipto.net](mailto:contact@snipto.net)**.
+1.  **GitHub Private Vulnerability Reporting (Preferred)**: go to the repository's **Security** tab and click **"Report a vulnerability"**. This creates a private advisory visible only to maintainers and provides a structured workflow for triage, fix coordination, and CVE assignment.
+2.  **Email**: send the details to **[contact@snipto.net](mailto:contact@snipto.net)**.
 
 We will respond within **72 hours** with an initial assessment and work with you to resolve the issue and coordinate a public disclosure.
 
@@ -33,7 +33,7 @@ Snipto is designed with a **zero-knowledge, end-to-end encrypted** model by defa
 *   **Server Never Sees Keys:** For Secret, Password, and Snipto ID modes, the server never receives the user's passphrase, password, or private keys.
 *   **Encryption is Client-Side:** All cryptographic operations (Argon2id key derivation, AES-256-GCM encryption, X25519 ECDH) are performed in the user's browser using WebAssembly (libsodium) or the WebCrypto API.
 *   **Payloads are Ciphertext:** In the encrypted modes, the server only stores encrypted payloads. Without the client-side key, the data is mathematically inaccessible. (The Plaintext mode is an explicit user opt-out of E2EE and stores the snippet as-is; the UI warns clearly when it is active.)
-*   **Files Ride the Same Envelope:** File sharing (up to 50 MiB, protected modes only) encrypts the file's **name, type, and contents** into a single client-side envelope before upload; the server stores one opaque binary blob and never sees any of the three. Downloads are offered as opaque `application/octet-stream` — never rendered, never trusting the sender's MIME string — and each link is good for exactly one download.
+*   **Files Ride the Same Envelope:** File sharing (up to 50 MiB, protected modes only) encrypts the file's **name, type, and contents** into a single client-side envelope before upload; the server stores one opaque binary blob and never sees any of the three. Downloads are offered as opaque `application/octet-stream`, never rendered and never trusting the sender's MIME string, and each link is good for exactly one download.
 
 ### Cryptographic Standards
 
@@ -47,7 +47,7 @@ Snipto is designed with a **zero-knowledge, end-to-end encrypted** model by defa
 Snipto enforces a strict CSP to prevent XSS and other client-side attacks:
 *   **No `unsafe-inline` or `unsafe-eval`:** Inline scripts/styles are only allowed with a per-request cryptographic nonce (`script-src`/`style-src` each carry a fresh nonce; the application's own inline scripts use it).
 *   **Trusted Types:** All DOM content injection uses Trusted Types (`snipto-srcdoc` policy) with sandboxed iframes.
-*   **WASM Support:** `script-src` contains only `'self'`, a per-request nonce, and `'wasm-unsafe-eval'` — the narrow WASM-only keyword required by libsodium's WebAssembly, which does not enable JavaScript `eval()`.
+*   **WASM Support:** `script-src` contains only `'self'`, a per-request nonce, and `'wasm-unsafe-eval'` : the narrow WASM-only keyword required by libsodium's WebAssembly, which does not enable JavaScript `eval()`.
 *   **No framed content:** `frame-src 'none'` blocks injected external frames (the payload's own sandboxed `srcdoc` iframes are exempt from this directive).
 *   **Violation reporting:** The policy declares `report-to`, resolved to the in-app collector at `/api/csp-report` via the `Reporting-Endpoints` header, so CSP violations are observable server-side.
 
@@ -56,7 +56,7 @@ Snipto enforces a strict CSP to prevent XSS and other client-side attacks:
 *   **Non-Deterministic Generation:** The same passphrase generates a different Snipto ID each time (random 16-byte salt).
 *   **Salt is Public:** The salt is published as part of the Snipto ID and stored on the server. Security relies on the secrecy of the passphrase.
 *   **Private Keys Never Stored:** Private keys are derived on-demand from the passphrase + salt and are never persisted.
-*   **Peer Key Validation:** Before any X25519 key agreement, the browser fully validates the peer's public key (subgroup membership check per RFC 9496: `[order]P = identity`, computed with a BigInt Montgomery ladder) — both when a sender uses a typed-in Snipto ID and when a recipient receives the sender's public key from the server. Small-order and quadratic-twist points, which a malicious server could use to force a predictable shared secret, are rejected before any authorization token leaves the browser. The implementation is pinned by RFC 7748's published test vectors and cross-checked against libsodium in CI.
+*   **Peer Key Validation:** Before any X25519 key agreement, the browser fully validates the peer's public key (subgroup membership check per RFC 9496: `[order]P = identity`, computed with a BigInt Montgomery ladder): both when a sender uses a typed-in Snipto ID and when a recipient receives the sender's public key from the server. Small-order and quadratic-twist points, which a malicious server could use to force a predictable shared secret, are rejected before any authorization token leaves the browser. The implementation is pinned by RFC 7748's published test vectors and cross-checked against libsodium in CI.
 *   **Out-of-Band Verification:** After encrypting to a Snipto ID, the sender sees the first 8 characters of the ID fingerprint on the success screen, so both parties can confirm out-of-band that the message was addressed to the intended ID.
 
 ## Known Limitations
