@@ -52,6 +52,11 @@ RUN echo 'expose_php = Off' > /usr/local/etc/php/conf.d/expose-php.ini
 # nginx's per-location 64M cap the first line of defense in prod.
 RUN { echo 'memory_limit = 384M'; echo 'post_max_size = 128M'; } > /usr/local/etc/php/conf.d/memory-limit.ini
 
+# PHP2Shell follow-up (Oct 23 2026 PoC family): no session-upload-progress
+# feature in Snipto; dead surface, disabled per PHP guidance. Also guards the
+# Docker Hub image (php -S serves it).
+RUN echo 'session.upload_progress.enabled = 0' > /usr/local/etc/php/conf.d/harden-session.ini
+
 # Install Node.js (needed for building assets)
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \

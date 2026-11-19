@@ -41,6 +41,12 @@ RUN echo 'expose_php = Off' > /usr/local/etc/php/conf.d/expose-php.ini
 # nginx's per-location 64M cap the first line of defense in prod.
 RUN { echo 'memory_limit = 384M'; echo 'post_max_size = 128M'; } > /usr/local/etc/php/conf.d/memory-limit.ini
 
+# PHP2Shell follow-up (Oct 23 2026 PoC family): Snipto has no multipart
+# session-upload-progress feature (file mode is reserve + raw PUT), so the
+# extension is dead surface. PHP guidance recommends disabling it until the
+# next regular bugfix release.
+RUN echo 'session.upload_progress.enabled = 0' > /usr/local/etc/php/conf.d/harden-session.ini
+
 # Install Node.js (needed for building assets)
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
