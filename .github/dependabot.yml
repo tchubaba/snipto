@@ -8,6 +8,12 @@ version: 2
 # tests/Feature/DependencyCooldownTest.php (composer.json and .npmrc carry
 # the matching install-time cooldowns).
 
+# Directory correctness matters: each ecosystem scans only the directories
+# listed, and a directory holding no parseable manifest for that ecosystem
+# makes the whole update run fail (the docker ecosystem aborts with
+# "No Dockerfiles nor Kubernetes YAML found" when pointed at a directory
+# without a Dockerfile). The same test pins these paths.
+
 updates:
   # Monitor GitHub Actions for updates
   - package-ecosystem: "github-actions"
@@ -25,9 +31,24 @@ updates:
     cooldown:
       default-days: 3
 
-  # Monitor Docker dependencies (base images, etc.)
+  # Monitor the base images named in FROM lines of docker/Dockerfile and
+  # docker/Dockerfile-fpm (php:8.5-cli, php:8.5-fpm), digest pins included.
+  # Only FROM lines are parsed: the COPY --from=composer:... line inside those
+  # files is out of reach for this ecosystem and stays a manual bump.
   - package-ecosystem: "docker"
-    directory: "/"
+    directories:
+      - "/docker"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 3
+
+  # Monitor the service images in docker-compose.yml and
+  # docker-compose.prod.yml (mariadb, crowdsecurity/openresty,
+  # crowdsecurity/crowdsec), digest pins included.
+  - package-ecosystem: "docker-compose"
+    directories:
+      - "/"
     schedule:
       interval: "weekly"
     cooldown:

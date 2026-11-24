@@ -42,7 +42,18 @@ class DependencyCooldownTest extends TestCase
         'github-actions',
         'composer',
         'docker',
+        'docker-compose',
         'npm',
+    ];
+
+    /**
+     * File-name patterns of the dependabot-core file finders for the
+     * ecosystems that abort the whole update run when the configured
+     * directory holds no matching file (dependency_file_not_found).
+     */
+    private const SCANNED_MANIFESTS = [
+        'docker'         => '/dockerfile|containerfile/i',
+        'docker-compose' => '/(docker-)?compose(-[\w]+)?(\.[\w-]+)?\.ya?ml/i',
     ];
 
     #[Test]
@@ -67,6 +78,46 @@ class DependencyCooldownTest extends TestCase
                 (int) ($entry['cooldown']['default-days'] ?? 0),
                 "Dependabot cooldown for {$ecosystem} is shorter than " . self::COOLDOWN_DAYS . ' days.'
             );
+        }
+    }
+
+    #[Test]
+    public function dependabot_directories_hold_files_the_ecosystem_can_parse()
+    {
+        $config = Yaml::parseFile(base_path('.github/dependabot.yml'));
+
+        foreach ($config['updates'] as $entry) {
+            $ecosystem = $entry['package-ecosystem'];
+
+            $directories = $entry['directories']
+                ?? (isset($entry['directory']) ? [$entry['directory']] : []);
+            $this->assertNotEmpty(
+                $directories,
+                "Dependabot entry for {$ecosystem} declares no directory."
+            );
+
+            foreach ($directories as $directory) {
+                $absolute = rtrim(base_path(ltrim($directory, '/')), '/');
+                $this->assertDirectoryExists(
+                    $absolute,
+                    "Dependabot entry for {$ecosystem} points at {$directory}, which does not exist."
+                );
+
+                if ( ! isset(self::SCANNED_MANIFESTS[$ecosystem])) {
+                    continue;
+                }
+
+                $matches = array_values(array_filter(
+                    scandir($absolute) ?: [],
+                    fn (string $file): bool => (bool) preg_match(self::SCANNED_MANIFESTS[$ecosystem], $file)
+                ));
+
+                $this->assertNotEmpty(
+                    $matches,
+                    "Dependabot {$ecosystem} entry points at {$directory}, which holds no file that "
+                        . 'ecosystem scans for; its update run aborts with dependency_file_not_found.'
+                );
+            }
         }
     }
 
