@@ -32,7 +32,7 @@ services:
 
   nginx:
     restart: unless-stopped
-    image: crowdsecurity/openresty:latest@sha256:7df24ec584e69b9656e38a8b7005ccdf75cf060c256bb9689adbec360679f67b
+    image: crowdsecurity/openresty:latest@sha256:1fc232e194574583839d0aebcc29cacd0186f66af0a3c1ac057ae8afcbb04b13
     container_name: snipto-nginx-1
     ports:
       # Bind strictly to 443 for production HTTPS
