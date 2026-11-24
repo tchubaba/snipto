@@ -1,25 +1,42 @@
 version: 2
+
+# Supply-chain cooldown: a release must be at least 3 days old before
+# Dependabot opens a version-update PR for it. Malicious releases are
+# usually pulled within hours of publication, so waiting filters them out
+# before they ever reach a pull request. Cooldown never applies to security
+# updates, which are still opened immediately. Pinned by
+# tests/Feature/DependencyCooldownTest.php (composer.json and .npmrc carry
+# the matching install-time cooldowns).
+
 updates:
   # Monitor GitHub Actions for updates
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3
 
   # Monitor Composer (PHP) dependencies
   - package-ecosystem: "composer"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3
 
   # Monitor Docker dependencies (base images, etc.)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3
 
   # Monitor npm (frontend) dependencies
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 3

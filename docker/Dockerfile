@@ -57,15 +57,20 @@ RUN { echo 'memory_limit = 384M'; echo 'post_max_size = 128M'; } > /usr/local/et
 # Docker Hub image (php -S serves it).
 RUN echo 'session.upload_progress.enabled = 0' > /usr/local/etc/php/conf.d/harden-session.ini
 
-# Install Node.js (needed for building assets)
+# Install Node.js (needed for building assets). Node 24 LTS bundles npm 11,
+# which is what enforces the min-release-age supply-chain cooldown in .npmrc
+# (npm 10 parses the key but ignores it). Node 20 is EOL.
 RUN mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
     && apt-get update \
     && apt-get install -y nodejs
 
-# Get latest Composer
-COPY --from=composer:latest@sha256:4d71c3c2109c61d5415544264b59ad4087e4c5b7244481723664138fd36d5040 /usr/bin/composer /usr/bin/composer
+# Get Composer. 2.11.2 is the first release that can enforce the
+# config.policy.cooldown supply-chain period; 2.10.2 and older parse and print
+# the setting but ignore it during dependency resolution. composer:latest is
+# currently pinned at 2.10.2 upstream, so the tag is set explicitly.
+COPY --from=composer:2.11.2@sha256:50ea4d33fdcde1adb0f045547295faa1548b33872e5f789dae5b02ce2fb5de93 /usr/bin/composer /usr/bin/composer
 
 # Create system user to run Composer and Artisan Commands
 # Robust check to prevent build failure if UID exists
