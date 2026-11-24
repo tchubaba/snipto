@@ -1,4 +1,4 @@
-FROM php:8.5-fpm@sha256:8b4b4a764f7985137b13e4cb49dd59e967d9daa7946a731f9d06e31e748e39bb
+FROM php:8.5-fpm@sha256:7fd2766bd3bb6efcfb49591e4bf014e123c18f01149093bd508525c6bdf0cf9f
 
 USER root
 
